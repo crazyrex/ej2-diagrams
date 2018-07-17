@@ -85,7 +85,6 @@ export class ToolBase {
      * Sets/Gets the previous object when mouse down
      */
     protected undoElement: SelectorModel = { nodes: [], connectors: [] };
-
     protected undoParentElement: SelectorModel = { nodes: [], connectors: [] };
 
     protected startAction(currentElement: IElement): void {
@@ -946,15 +945,15 @@ export class ResizeTool extends ToolBase {
         source?: SelectorModel)
         : boolean {
         if (source.nodes.length === 1 && source.nodes[0].constraints & NodeConstraints.AspectRatio) {
-            if (corner === 'ResizeWest' || corner === 'ResizeEast' || corner === 'ResizeNorth' || corner === 'ResizeSouth') {
-                if (!(deltaHeight === 1 && deltaWidth === 1)) {
-                    deltaHeight = deltaWidth = Math.max(deltaHeight === 1 ? 0 : deltaHeight, deltaWidth === 1 ? 0 : deltaWidth);
+           if (corner === 'ResizeWest' || corner === 'ResizeEast' || corner === 'ResizeNorth' || corner === 'ResizeSouth') {
+               if (!(deltaHeight === 1 && deltaWidth === 1)) {
+                   deltaHeight = deltaWidth = Math.max(deltaHeight === 1 ? 0 : deltaHeight, deltaWidth === 1 ? 0 : deltaWidth);
                 }
             } else if (startPoint !== endPoint) {
                 deltaHeight = deltaWidth = Math.max(deltaHeight, deltaWidth);
             } else {
                 deltaHeight = deltaWidth = 0;
-            }
+             }
         }
         let oldValue: SelectorModel = {
             offsetX: source.offsetX, offsetY: source.offsetY,

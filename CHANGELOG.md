@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## 16.2.45 (2018-07-17)
+
+### Diagram
+
+#### Bug Fixes
+
+- Issue on click event arguments have been resolved.
+
 ## 16.2.41 (2018-06-25)
 
 ### Diagram

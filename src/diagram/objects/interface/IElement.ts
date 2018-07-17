@@ -140,6 +140,8 @@ export interface IClickEventArgs {
     element: SelectorModel | Diagram;
     position: PointModel;
     count: number;
+    /** returns the actual object that is clicked or id of the diagram */
+    actualObject: SelectorModel | Diagram;
 }
 
 /**
@@ -150,6 +152,15 @@ export interface IDoubleClickEventArgs {
     source: SelectorModel | Diagram;
     position: PointModel;
     count: number;
+}
+
+export interface IMouseEventArgs {
+    /** returns the target node or connector */
+    element: NodeModel | ConnectorModel | SelectorModel;
+    /**  returns the object from where the selected object is dragged */
+    actualObject: Object;
+    /** returns the target object over which the selected object is dragged */
+    targets: (NodeModel | ConnectorModel)[];
 }
 
 /**

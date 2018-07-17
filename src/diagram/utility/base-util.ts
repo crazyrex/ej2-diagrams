@@ -84,12 +84,7 @@ export function cloneObject(obj: Object, additionalProp?: Function | string, key
             if (property !== 'wrapper') {
                 let constructorId: string = 'constructor';
                 let name: string = 'name';
-                let isEventEmmitter: boolean =
-                        obj[property] &&
-                        obj[property][constructorId] &&
-                        obj[property][constructorId][name] &&
-                        obj[property][constructorId][name] === 'EventEmitter'
-                            ? true : false;
+                let isEventEmmitter: boolean = obj[property] && obj.hasOwnProperty('observers') ? true : false;
                 if (!isEventEmmitter) {
                     if (obj[property] instanceof Array) {
                         newObject[property] = cloneArray(

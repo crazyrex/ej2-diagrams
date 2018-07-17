@@ -1,6 +1,6 @@
 import { PointModel } from '../primitives/point-model';
 import { Point } from '../primitives/point';
-import { IElement, IClickEventArgs, IDoubleClickEventArgs } from '../objects/interface/IElement';
+import { IElement, IClickEventArgs, IDoubleClickEventArgs, IMouseEventArgs } from '../objects/interface/IElement';
 import { DiagramElement } from '../core/elements/diagram-element';
 import { Container } from '../core/containers/container';
 import { MarginModel } from '../core/appearance-model';
@@ -61,11 +61,6 @@ export class DiagramEventHandler {
                 }
                 this.tool = null;
             }
-            if (action === 'Rotate') {
-                this.diagram.diagramCanvas.classList.add('e-diagram-rotate');
-            } else if (this.currentAction === 'Rotate') {
-                this.diagram.diagramCanvas.classList.remove('e-diagram-rotate');
-            }
             this.currentAction = action;
             if (this.currentAction !== 'None' && this.currentAction !== 'Select' &&
                 !(this.diagram.diagramActions & DiagramAction.TextEdit)) {
@@ -115,6 +110,8 @@ export class DiagramEventHandler {
     private tool: ToolBase = null;
 
     private eventArgs: MouseEventArgs = null;
+
+    private lastObjectUnderMouse: NodeModel | ConnectorModel;
 
     private hoverElement: NodeModel | ConnectorModel;
 
@@ -213,7 +210,7 @@ export class DiagramEventHandler {
     private isForeignObject(target: HTMLElement, isTextBox?: boolean): HTMLElement {
         let foreignobject: HTMLElement = target;
         if (foreignobject) {
-            while (foreignobject.parentNode != null) {
+            while (foreignobject.parentNode !== null) {
                 if (typeof foreignobject.className === 'string' &&
                     ((!isTextBox && foreignobject.className.indexOf('foreign-object') !== -1) ||
                         (isTextBox && foreignobject.className.indexOf('e-diagram-text-edit') !== -1))) {
@@ -244,7 +241,7 @@ export class DiagramEventHandler {
             }
             if (this.tool instanceof PolygonDrawingTool && (evt.button === 2 || evt.buttons === 2)) {
                 let arg: IClickEventArgs = {
-                    element: this.diagram, position: this.currentPosition, count: evt.buttons
+                    element: this.diagram, position: this.currentPosition, count: evt.buttons, actualObject: this.eventArgs.actualObject
                 };
                 this.inAction = false;
                 this.tool.mouseUp(this.eventArgs, arg);
@@ -260,8 +257,10 @@ export class DiagramEventHandler {
                 this.eventArgs = {};
                 this.diagram.endEdit();
                 let target: NodeModel | PointPortModel;
-                let objects: IElement[] = this.objectFinder.findObjectsUnderMouse(this.currentPosition, this.diagram, null, this.action);
-                let obj: IElement = this.objectFinder.findObjectUnderMouse(this.diagram, objects, this.action, this.inAction, evt);
+                let objects: IElement[] = this.objectFinder.findObjectsUnderMouse(
+                    this.currentPosition, this.diagram, this.eventArgs, null, this.action);
+                let obj: IElement = this.objectFinder.findObjectUnderMouse(
+                    this.diagram, objects, this.action, this.inAction, this.eventArgs, evt);
                 let sourceElement: DiagramElement = null;
                 if (obj !== null) {
                     sourceElement = this.diagram.findElementUnderMouse(obj, this.currentPosition);
@@ -380,6 +379,7 @@ export class DiagramEventHandler {
                     this.action = this.diagram.findActionToBeDone(obj, sourceElement, this.currentPosition, target);
                     this.getMouseEventArgs(this.currentPosition, this.eventArgs);
                     this.tool = this.getTool(this.action);
+                    this.mouseEvents();
                     if (this.tool instanceof ConnectorDrawingTool) {
                         this.tool.mouseMove(this.eventArgs);
                     } else if (this.tool instanceof PolygonDrawingTool) {
@@ -405,6 +405,7 @@ export class DiagramEventHandler {
                         this.eventArgs.source instanceof Selector) {
                         this.getMouseEventArgs(this.currentPosition, this.eventArgs);
                     }
+                    this.mouseEvents();
                     if (e.ctrlKey || e.shiftKey) {
                         let info: Info = (e.ctrlKey && e.shiftKey) ? { ctrlKey: e.ctrlKey, shiftKey: e.shiftKey } : { ctrlKey: true };
                         this.eventArgs.info = info;
@@ -528,7 +529,8 @@ export class DiagramEventHandler {
             }
             if (!this.inAction && !this.diagram.currentSymbol) {
                 let arg: IClickEventArgs = {
-                    element: this.eventArgs.source || this.diagram, position: this.eventArgs.position, count: evt.detail
+                    element: this.eventArgs.source || this.diagram, position: this.eventArgs.position, count: evt.detail,
+                    actualObject: this.eventArgs.actualObject
                 };
                 this.diagram.triggerEvent(DiagramEvent.click, arg);
             }
@@ -562,9 +564,6 @@ export class DiagramEventHandler {
         this.eventArgs = {};
         this.tool = null;
         removeRulerMarkers();
-        if (this.action === 'Rotate') {
-            this.diagram.diagramCanvas.classList.remove('e-diagram-rotate');
-        }
         evt.preventDefault();
     }
     /** @private */
@@ -696,6 +695,36 @@ export class DiagramEventHandler {
             }
             this.tool.mouseMove(this.eventArgs);
             this.diagram.scroller.zoom(1, -left, -top, pos);
+        }
+    }
+
+    private mouseEvents(): void {
+        let element: NodeModel | ConnectorModel | SelectorModel = this.eventArgs.source;
+        if (element instanceof Selector && (element.nodes.length + element.connectors.length === 1)) {
+            element = (element.nodes.length === 1) ? element.nodes[0] : element.connectors[0];
+        }
+        let target: (NodeModel | ConnectorModel)[] = this.diagram.findObjectsUnderMouse(this.currentPosition);
+        for (let i: number = 0; i < target.length; i++) {
+            if (this.eventArgs.actualObject === target[i]) {
+                target.splice(i, 1);
+            }
+        }
+        let arg: IMouseEventArgs = {
+            targets: target,
+            element: (this.eventArgs.source === this.eventArgs.actualObject) ? undefined : element,
+            actualObject: this.eventArgs.actualObject
+        };
+        if (this.lastObjectUnderMouse && (!this.eventArgs.actualObject || (this.lastObjectUnderMouse !== this.eventArgs.actualObject))) {
+            arg.element = this.lastObjectUnderMouse; arg.targets = arg.actualObject = undefined;
+            this.diagram.triggerEvent(DiagramEvent.mouseLeave, arg);
+            this.lastObjectUnderMouse = null;
+        }
+        if (!this.lastObjectUnderMouse && this.eventArgs.source || (this.lastObjectUnderMouse !== this.eventArgs.actualObject)) {
+            this.lastObjectUnderMouse = this.eventArgs.actualObject;
+            this.diagram.triggerEvent(DiagramEvent.mouseEnter, arg);
+        }
+        if (this.eventArgs.actualObject) {
+            this.diagram.triggerEvent(DiagramEvent.mouseOver, arg);
         }
     }
 
@@ -886,6 +915,7 @@ export class DiagramEventHandler {
             args.target = obj;
             args.targetWrapper = wrapper;
         }
+        args.actualObject = this.eventArgs.actualObject;
         args.startTouches = this.touchStartList;
         args.moveTouches = this.touchMoveList;
         return args;
@@ -974,16 +1004,16 @@ export class DiagramEventHandler {
     }
     /** @private */
     public findObjectsUnderMouse(position: PointModel, source?: IElement): IElement[] {
-        return this.objectFinder.findObjectsUnderMouse(position, this.diagram, source);
+        return this.objectFinder.findObjectsUnderMouse(position, this.diagram, this.eventArgs, source);
     }
     /** @private */
     public findObjectUnderMouse(objects: (NodeModel | ConnectorModel)[], action: Actions, inAction: boolean): IElement {
-        return this.objectFinder.findObjectUnderMouse(this.diagram, objects, action, inAction, this.currentPosition);
+        return this.objectFinder.findObjectUnderMouse(this.diagram, objects, action, inAction, this.eventArgs, this.currentPosition);
     }
     /** @private */
     public findTargetUnderMouse(
         objects: (NodeModel | ConnectorModel)[], action: Actions, inAction: boolean, position: PointModel, source?: IElement): IElement {
-        return this.objectFinder.findObjectUnderMouse(this.diagram, objects, action, inAction, position, source);
+        return this.objectFinder.findObjectUnderMouse(this.diagram, objects, action, inAction, this.eventArgs, position, source);
     }
     /** @private */
     public findActionToBeDone(
@@ -1000,12 +1030,16 @@ export class DiagramEventHandler {
 /** @private */
 class ObjectFinder {
     /** @private */
-    public findObjectsUnderMouse(pt: PointModel, diagram: Diagram, source?: IElement, actions?: Actions): IElement[] {
+    public findObjectsUnderMouse(
+        pt: PointModel, diagram: Diagram, eventArgs: MouseEventArgs, source?: IElement, actions?: Actions): IElement[] {
         // finds the collection of the object that is under the mouse;
         let actualTarget: (NodeModel | ConnectorModel)[] = [];
         if (source && source instanceof Selector) {
             if (source.nodes.length + source.connectors.length === 1) {
                 source = (source.nodes[0] || source.connectors[0]) as IElement;
+                if ((source as Node).children && (source as Node).children.length === 0) {
+                    eventArgs.actualObject = source;
+                }
             }
         }
         let container: Container;
@@ -1107,7 +1141,7 @@ class ObjectFinder {
     /** @private */
     public findObjectUnderMouse(
         diagram: Diagram, objects: (NodeModel | ConnectorModel)[], action: Actions,
-        inAction: boolean, position?: PointModel, source?: IElement
+        inAction: boolean, eventArg: MouseEventArgs, position?: PointModel, source?: IElement
     ): IElement {
         //we will get the wrapper object here
         //we have to choose the object to be interacted with from the given wrapper
@@ -1130,6 +1164,7 @@ class ObjectFinder {
                         if (connector) {
                             actualTarget = this.isTarget(actualTarget as Node, diagram, action);
                         }
+                        eventArg.actualObject = actualTarget as Node;
                         return actualTarget as IElement;
                     }
                 }
@@ -1138,6 +1173,7 @@ class ObjectFinder {
                     if (objects[i] instanceof Node && canInConnect(objects[i] as NodeModel)) {
                         actualTarget = objects[i];
                         actualTarget = this.isTarget(actualTarget as Node, diagram, action);
+                        eventArg.actualObject = actualTarget as Node;
                         return actualTarget as IElement;
                     }
                 }
@@ -1165,6 +1201,9 @@ class ObjectFinder {
                         actualTarget = null;
                     }
                 }
+                if (actualTarget) {
+                    eventArg.actualObject = actualTarget as Node;
+                }
                 return actualTarget as IElement;
             } else if (action === 'Select' && diagram[eventHandler].tool) {
                 for (let i: number = objects.length - 1; i >= 0; i--) {
@@ -1185,6 +1224,7 @@ class ObjectFinder {
                     }
                 }
                 actualTarget = objects[objects.length - 1];
+                eventArg.actualObject = actualTarget as Node;
                 if ((actualTarget as Node).parentId) {
                     let obj: Node = actualTarget as Node;
                     let selected: boolean = isSelected(diagram, obj);
@@ -1207,6 +1247,9 @@ class ObjectFinder {
                 }
             } else {
                 actualTarget = objects[objects.length - 1];
+                if (eventArg && actualTarget) {
+                    eventArg.actualObject = actualTarget as Node;
+                }
             }
         }
         return actualTarget as IElement;
@@ -1269,4 +1312,5 @@ export interface MouseEventArgs {
     startTouches?: TouchList | ITouches[];
     moveTouches?: TouchList | ITouches[];
     clickCount?: number;
+    actualObject?: IElement;
 }

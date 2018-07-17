@@ -14,7 +14,7 @@ import { IElement, IDataLoadedEventArgs, ISelectionChangeEventArgs, IClickEventA
 import { ISizeChangeEventArgs, IConnectionChangeEventArgs, IEndChangeEventArgs, IDoubleClickEventArgs } from './objects/interface/IElement';
 import { ICollectionChangeEventArgs, IPropertyChangeEventArgs, IDraggingEventArgs, IRotationEventArgs } from './objects/interface/IElement';
 import { IDragEnterEventArgs, IDragLeaveEventArgs, IDragOverEventArgs, IDropEventArgs } from './objects/interface/IElement';
-import { ITextEditEventArgs, IHistoryChangeArgs, IScrollChangeEventArgs } from './objects/interface/IElement';
+import { ITextEditEventArgs, IHistoryChangeArgs, IScrollChangeEventArgs, IMouseEventArgs } from './objects/interface/IElement';
 import { ZoomOptions, IPrintOptions, IExportOptions, IFitOptions, ActiveLabel } from './objects/interface/interfaces';
 import { View } from './objects/interface/interfaces';
 import { Container } from './core/containers/container';
@@ -434,6 +434,8 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
     @Event()
     public dragOver: EmitType<IDragOverEventArgs>;
 
+
+
     /**
      * Triggers once  click on the diagram.
      * @event
@@ -547,6 +549,27 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
      */
     @Event()
     public created: EmitType<Object>;
+
+    /**
+     * * Triggered when mouse enters a node/connector.
+     * @event
+     */
+    @Event()
+    public mouseEnter: EmitType<IMouseEventArgs>;
+
+    /**
+     * Triggered when mouse leaves node/connector.
+     * @event
+     */
+    @Event()
+    public mouseLeave: EmitType<IMouseEventArgs>;
+
+    /**
+     * Triggered when mouse hovers a node/connector.
+     * @event
+     */
+    @Event()
+    public mouseOver: EmitType<IMouseEventArgs>;
 
     /**
      * Triggers before context menu opens.

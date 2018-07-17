@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+
+<head>
+    <title> Connectors </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+
+    <script data-main="snap" src="../../node_modules/requirejs/require.js"></script>
+
+    <script>
+        require.config({
+            packages: [{
+                name: '@syncfusion/ej2-base',
+                location: '../../node_modules/@syncfusion/ej2-base',
+                main: 'index.js'
+            },
+            {
+                name: '@syncfusion/ej2-data',
+                location: '../../node_modules/@syncfusion/ej2-data',
+                main: 'index.js'
+            }
+            ]
+        });
+    </script>
+</head>
+
+
+<body>
+    <div id="diagram"> </div>
+</body>
+
+</html>
