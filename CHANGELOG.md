@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## 16.2.46 (2018-07-30)
+
+### Diagram
+
+#### Bug Fixes
+
+- Issue on Drag event arguments have been resolved.
+- Issue on changing the background image at run time has been fixed.
+
 ## 16.2.45 (2018-07-17)
 
 ### Diagram

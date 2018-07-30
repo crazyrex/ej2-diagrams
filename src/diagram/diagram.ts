@@ -1774,8 +1774,19 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
 
     /** @private */
     public triggerEvent(eventName: DiagramEvent, args: Object): void {
+        if (args) {
+            this.updateEventValue(args as IDropEventArgs);
+        }
         this.trigger(DiagramEvent[eventName], args);
     }
+
+    private updateEventValue(args: IDropEventArgs): void {
+        let element: NodeModel | ConnectorModel | SelectorModel = args.element;
+        if ((args as IDropEventArgs).element && element instanceof Selector && (element.nodes.length + element.connectors.length === 1)) {
+            args.element = (element.nodes.length === 1) ? element.nodes[0] : element.connectors[0];
+        }
+    }
+
     /**
      * Adds the given object to diagram control
      * @param obj Defines the object that has to be added to diagram

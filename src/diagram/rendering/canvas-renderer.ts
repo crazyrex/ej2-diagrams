@@ -404,15 +404,13 @@ export class CanvasRenderer implements IRenderer {
              *             ctx.drawImage(imageObj, obj.x, obj.y, obj.width, obj.height);
              * }
              */
-            // imageObj.onload = () => {
-            ctx.translate(pivotX, pivotY);
+            imageObj.onload = () => {
             ctx.rotate(obj.angle * Math.PI / 180);
             let image: HTMLImageElement = new Image();
             image.src = obj.source;
-            this.image(ctx, image, -obj.width / 2, -obj.height / 2, obj.width, obj.height, obj);
+            this.image(ctx, image, obj.x, obj.y, obj.width, obj.height, obj);
             ctx.rotate(-(obj.angle * Math.PI / 180));
-            ctx.translate(-pivotX, -pivotY);
-            // };
+            };
 
             ctx.restore();
         }

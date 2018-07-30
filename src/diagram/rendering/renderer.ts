@@ -1057,9 +1057,9 @@ export class DiagramRenderer {
             target = document.createElementNS('http://www.w3.org/2000/svg', 'image');
             target.setAttribute('id', diagramElement.id + '_image');
             bgimageLayer.appendChild(target);
-            target.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', background.source);
-        }
+            }
         if (target) {
+            target.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', background.source);
             let scale: string = background.scale !== 'None' ? background.scale : '';
             let imgAlign: string = background.align;
             let aspectRatio: string = imgAlign.charAt(0).toLowerCase() + imgAlign.slice(1) + ' '

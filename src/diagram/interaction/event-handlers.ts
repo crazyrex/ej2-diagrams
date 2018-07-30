@@ -518,7 +518,6 @@ export class DiagramEventHandler {
                     this.tool = null;
                 }
             }
-            this.eventArgs = {};
             if (!touches) {
                 evt.preventDefault();
             }
@@ -534,6 +533,7 @@ export class DiagramEventHandler {
                 };
                 this.diagram.triggerEvent(DiagramEvent.click, arg);
             }
+            this.eventArgs = {};
         }
         //end the corresponding tool
     }
@@ -699,10 +699,6 @@ export class DiagramEventHandler {
     }
 
     private mouseEvents(): void {
-        let element: NodeModel | ConnectorModel | SelectorModel = this.eventArgs.source;
-        if (element instanceof Selector && (element.nodes.length + element.connectors.length === 1)) {
-            element = (element.nodes.length === 1) ? element.nodes[0] : element.connectors[0];
-        }
         let target: (NodeModel | ConnectorModel)[] = this.diagram.findObjectsUnderMouse(this.currentPosition);
         for (let i: number = 0; i < target.length; i++) {
             if (this.eventArgs.actualObject === target[i]) {
@@ -711,7 +707,7 @@ export class DiagramEventHandler {
         }
         let arg: IMouseEventArgs = {
             targets: target,
-            element: (this.eventArgs.source === this.eventArgs.actualObject) ? undefined : element,
+            element: (this.eventArgs.source === this.eventArgs.actualObject) ? undefined : this.eventArgs.source,
             actualObject: this.eventArgs.actualObject
         };
         if (this.lastObjectUnderMouse && (!this.eventArgs.actualObject || (this.lastObjectUnderMouse !== this.eventArgs.actualObject))) {
