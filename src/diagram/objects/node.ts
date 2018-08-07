@@ -920,13 +920,13 @@ export class Node extends NodeBase implements IElement {
                 }
                 break;
             case 'Native':
-                let nativeContent: DiagramNativeElement = new DiagramNativeElement();
+                let nativeContent: DiagramNativeElement = new DiagramNativeElement(this.id, diagram.element.id);
                 nativeContent.content = (this.shape as Native).content;
                 nativeContent.scale = (this.shape as Native).scale;
                 content = nativeContent;
                 break;
             case 'HTML':
-                let htmlContent: DiagramHtmlElement = new DiagramHtmlElement();
+                let htmlContent: DiagramHtmlElement = new DiagramHtmlElement(this.id, diagram.element.id);
                 htmlContent.content = (this.shape as Html).content;
                 content = htmlContent;
                 break;
@@ -1033,7 +1033,7 @@ export class Node extends NodeBase implements IElement {
         return { x, y };
     }
     /** @private */
-    public initIcons(accessibilityContent: Function | string, layout: LayoutModel, container: Container): void {
+    public initIcons(accessibilityContent: Function | string, layout: LayoutModel, container: Container, diagramId: string): void {
         let canvas: Container = this.wrapper;
         let offset: PointModel;
         let icon: IconShapeModel = this.isExpanded ? this.expandIcon : this.collapseIcon;
@@ -1053,7 +1053,7 @@ export class Node extends NodeBase implements IElement {
             offset = this.getIconOffet(layout, icon as IconShape);
             iconContainer.setOffsetWithRespectToBounds(offset.x, offset.y, 'Fraction');
             iconContainer.relativeMode = 'Point';
-            this.initIconSymbol(icon, iconContainer, accessibilityContent);
+            this.initIconSymbol(icon, iconContainer, accessibilityContent, diagramId);
             // tslint:disable-next-line:no-any
             let wrapperContent: any;
             let contentAccessibility: Function = getFunction(accessibilityContent);
@@ -1165,11 +1165,12 @@ export class Node extends NodeBase implements IElement {
         return rect;
     }
 
-    private initIconSymbol(options: IconShapeModel, iconContainer: Canvas, accessibilityContent: Function | string): void {
+    private initIconSymbol(
+        options: IconShapeModel, iconContainer: Canvas, accessibilityContent: Function | string, diagramId: string): void {
         let iconContent: PathElement | DiagramNativeElement;
         iconContainer.children.push(this.initIconContainer(options, iconContainer));
         if (options.shape === 'Template') {
-            iconContent = new DiagramNativeElement();
+            iconContent = new DiagramNativeElement(this.id, diagramId);
             iconContent.content = options.content;
             iconContent.height = 10;
             iconContent.width = 10;

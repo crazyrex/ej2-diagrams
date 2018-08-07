@@ -8,11 +8,11 @@ import { processPathData, splitArrayCollection, transformPath } from './path-uti
 import { whiteSpaceToString, wordBreakToString, textAlignToString, bBoxText } from './base-util';
 import { Matrix, identityMatrix, transformPointByMatrix, rotateMatrix } from '../primitives/matrix';
 import { ITouches } from '../objects/interface/interfaces';
-import { compile, createElement } from '@syncfusion/ej2-base';
+import { compile, createElement, Browser } from '@syncfusion/ej2-base';
 import { DiagramHtmlElement } from '../core/elements/html-element';
 import { DiagramNativeElement } from '../core/elements/native-element';
 import { BaseAttributes, TextAttributes, SubTextElement, TextBounds } from '../rendering/canvas-interface';
-
+import { getElement } from './diagram-util';
 /**
  * Defines the functionalities that need to access DOM
  */
@@ -24,7 +24,7 @@ export function findSegmentPoints(element: PathElement): PointModel[] {
     let measureElement: string = 'measureElement';
     window[measureElement].style.visibility = 'visible';
     let svg: SVGSVGElement = window[measureElement].children[2];
-    let pathNode: SVGPathElement = svg.children[0] as SVGPathElement;
+    let pathNode: SVGPathElement = getChildNode(svg)[0] as SVGPathElement;
     pathNode.setAttributeNS(null, 'd', element.data);
     let pathBounds: SVGRect = element.absoluteBounds; // || pathNode.getBBox();
     let pathData: string = updatePath(element, pathBounds, element);
@@ -37,6 +37,22 @@ export function findSegmentPoints(element: PathElement): PointModel[] {
     window[measureElement].style.visibility = 'hidden';
     return pts;
 
+}
+
+export function getChildNode(node: SVGElement): SVGElement[] | HTMLCollection {
+    let child: SVGElement;
+    let collection: SVGElement[] | HTMLCollection = [];
+    if (Browser.info.name === 'msie' || Browser.info.name === 'edge') {
+        for (let i: number = 0; i < node.childNodes.length; i++) {
+            child = node.childNodes[i] as SVGElement;
+            if (child.nodeType === 1) {
+                collection.push(child);
+            }
+        }
+    } else {
+        collection = node.children;
+    }
+    return collection;
 }
 
 export function translatePoints(element: PathElement, points: PointModel[]): PointModel[] {
@@ -67,7 +83,7 @@ export function measurePath(data: string): Rect {
         let measureElement: string = 'measureElement';
         window[measureElement].style.visibility = 'visible';
         let svg: SVGSVGElement = window[measureElement].children[2];
-        let element: SVGPathElement = svg.children[0] as SVGPathElement;
+        let element: SVGPathElement = getChildNode(svg)[0] as SVGPathElement;
         element.setAttribute('d', data);
         let bounds: SVGRect = element.getBBox();
         let svgBounds: Rect = new Rect(bounds.x, bounds.y, bounds.width, bounds.height);
@@ -576,11 +592,12 @@ export function getContent(element: DiagramHtmlElement | DiagramNativeElement, i
     } else {
         div = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     }
+    let node: Object = getElement(element);
     let item: HTMLElement | SVGElement;
     if (typeof element.content === 'string') {
         let compiledString: Function;
         compiledString = compile(element.content);
-        for (item of compiledString({})) {
+        for (item of compiledString(node)) {
             div.appendChild(item);
         }
     } else {

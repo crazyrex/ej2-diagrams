@@ -3014,7 +3014,7 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
                             extendObject(defaults, obj);
                         }
                     }
-                    this.initNode(obj);
+                    this.initNode(obj, this.element.id);
                 }
 
             } else if (obj instanceof Connector) {
@@ -3141,7 +3141,7 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
         }
     }
 
-    private initNode(obj: Node): void {
+    private initNode(obj: Node, diagramId: string): void {
         let canvas: Container = obj.initContainer();
         let portContainer: Canvas = new Canvas();
         let content: DiagramElement;
@@ -3182,7 +3182,7 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
         let container: Container = obj.children ? portContainer : canvas;
         obj.initAnnotations(this.getDescription, container);
         obj.initPorts(this.getDescription, container);
-        obj.initIcons(this.getDescription, this.layout, container);
+        obj.initIcons(this.getDescription, this.layout, container, diagramId);
         canvas.measure(new Size(obj.width, obj.height));
         canvas.arrange(canvas.desiredSize);
     }
@@ -4856,7 +4856,7 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
             actualObject.wrapper.children.splice(index, 1);
         }
         let portContainer: Container = this.getPortContainer(actualObject);
-        actualObject.initIcons(this.getDescription, this.layout, portContainer);
+        actualObject.initIcons(this.getDescription, this.layout, portContainer, this.element.id);
     }
 
     private getPortContainer(actualObject: Node): Container {

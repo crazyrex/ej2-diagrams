@@ -8,10 +8,14 @@ export class DiagramHtmlElement extends DiagramElement {
     /**
      * set the id for each element
      */
-    public constructor() {
+    public constructor(nodeId: string, diagramId: string) {
         super();
+        this.diagramId = diagramId;
+        this.nodeId = nodeId;
     }
     private data: string | HTMLElement = '';
+    public nodeId: string = '';
+    public diagramId: string = '';
 
     /**
      * Gets or sets the geometry of the html element

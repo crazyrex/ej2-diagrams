@@ -1,7 +1,7 @@
 import { createElement } from '@syncfusion/ej2-base';
 import { Diagram } from '../../../src/diagram/diagram';
 import { NodeModel, BasicShapeModel, BpmnActivityModel, BpmnSubProcessModel } from '../../../src/diagram/objects/node-model';
-import { NodeConstraints, ConnectorModel, BpmnShape } from '../../../src/index';
+import { NodeConstraints, ConnectorModel, BpmnShape, LinearGradientModel } from '../../../src/index';
 import { MouseEvents } from '../../diagram/interaction/mouseevents.spec';
 
 
@@ -18,9 +18,26 @@ describe('Diagram Control', () => {
         beforeAll((): void => {
             ele = createElement('div', { id: 'diagram' });
             document.body.appendChild(ele);
+            let linearGradient: LinearGradientModel;
+            linearGradient = {
+                //Start point of linear gradient
+                x1: 0,
+                y1: 0,
+                //End point of linear gradient
+                x2: 50,
+                y2: 50,
+                //Sets an array of stop objects
+                stops: [{ color: "white", offset: 0 },
+                { color: "darkCyan", offset: 100 }
+                ],
+                type: 'Linear'
+            };
             let nod: NodeModel = {
                 id: 'nod', width: 100, height: 100, offsetX: 300, offsetY: 300,
                 constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
+                style: {
+                    gradient: linearGradient
+                },
 
                 shape: {
                     type: 'Bpmn', shape: 'Activity', activity: {
@@ -82,13 +99,16 @@ describe('Diagram Control', () => {
         });
 
         it('Checking parent enlarge with respect to child drag', (done: Function) => {
+            let ele = document.getElementById("nod_boundary");
+            let value = ele.getAttribute("fill");
             let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
             let node = diagram.nameTable['end'].wrapper;
             mouseEvents.dragAndDropEvent(diagramCanvas, node.bounds.center.x, node.bounds.center.y, node.bounds.center.x + 30, node.bounds.center.y);
 
             // expect(node.margin.left === 330).toBe(true);
             // done();
-            expect(diagram.nameTable['nodea'].wrapper.bounds.containsRect(diagram.nameTable['end'].wrapper.bounds)).toBe(true);
+            expect(value ===
+                "url(#nod_boundary_linear)" && diagram.nameTable['nodea'].wrapper.bounds.containsRect(diagram.nameTable['end'].wrapper.bounds)).toBe(true);
             done();
         });
         it('Checking updating parent  with respect to child drag - undo', (done: Function) => {

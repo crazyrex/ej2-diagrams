@@ -6,6 +6,7 @@ import { Matrix, identityMatrix, transformPointByMatrix, rotateMatrix } from '..
 import { TextAlign, TextWrap, WhiteSpace, TextDecoration } from '../enum/enum';
 import { getValue } from '@syncfusion/ej2-base';
 import { TextAttributes } from '../rendering/canvas-interface';
+import { getChildNode } from './dom-util';
 /**
  * Implements the basic functionalities
  */
@@ -21,7 +22,7 @@ export function randomId(): string {
             let intCrypto: any = (window as any).msCrypto || window.crypto;
             num = intCrypto.getRandomValues(count)[0] % (chars.length - 1);
         } else {
-            Math.floor(Math.random() * chars.length);
+            num = Math.floor(Math.random() * chars.length);
         }
         id += chars.substring(num, num + 1);
     }
@@ -239,7 +240,7 @@ export function bBoxText(textContent: string, options: TextAttributes): number {
     let measureElement: string = 'measureElement';
     window[measureElement].style.visibility = 'visible';
     let svg: SVGElement = window[measureElement].children[2];
-    let text: SVGTextElement = svg.children[1] as SVGTextElement;
+    let text: SVGTextElement = getChildNode(svg)[1] as SVGTextElement;
     text.textContent = textContent;
     text.setAttribute('style', 'font-size:' + options.fontSize + 'px; font-family:'
         + options.fontFamily + ';font-weight:' + (options.bold ? 'bold' : 'normal'));

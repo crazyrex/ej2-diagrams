@@ -663,14 +663,14 @@ export function updateShape(node: Node, actualObject: Node, oldObject: Node, dia
             updateShapeContent(content, actualObject, diagram);
             break;
         case 'Native':
-            let nativeContent: DiagramNativeElement = new DiagramNativeElement();
+            let nativeContent: DiagramNativeElement = new DiagramNativeElement(node.id, diagram.element.id);
             nativeContent.content = (actualObject.shape as Native).content;
             nativeContent.scale = (actualObject.shape as Native).scale;
             content = nativeContent;
             updateShapeContent(content, actualObject, diagram);
             break;
         case 'HTML':
-            let htmlContent: DiagramHtmlElement = new DiagramHtmlElement();
+            let htmlContent: DiagramHtmlElement = new DiagramHtmlElement(node.id, diagram.element.id);
             htmlContent.content = (actualObject.shape as Html).content;
             content = htmlContent;
             updateShapeContent(content, actualObject, diagram);
@@ -949,6 +949,21 @@ export function insertObject(obj: NodeModel | ConnectorModel, key: string, colle
             collection.splice(high, 0, obj);
         }
     }
+}
+
+/** @private */
+export function getElement(element: DiagramHtmlElement | DiagramNativeElement): Object {
+    let diagramElement: Object = document.getElementById(element.diagramId);
+    let instance: string = 'ej2_instances';
+    let node: {} = {};
+    let nodes: Object = diagramElement[instance][0].nodes;
+    let length: string = 'length';
+    for (let i: number = 0; nodes && i < nodes[length]; i++) {
+        if (nodes[i].id === element.nodeId) {
+            return nodes[i];
+        }
+    }
+    return null;
 }
 
 /**

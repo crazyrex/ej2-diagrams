@@ -12,11 +12,14 @@ export class DiagramNativeElement extends DiagramElement {
     /**
      * set the id for each element
      */
-    public constructor() {
+    public constructor(nodeId: string, diagramId: string) {
         super();
+        this.diagramId = diagramId;
+        this.nodeId = nodeId;
     }
-     private data: string | SVGElement = '';
-
+    private data: string | SVGElement = '';
+    public nodeId: string = '';
+    public diagramId: string = '';
     /**
      * Gets or sets the geometry of the native element
      */
@@ -64,7 +67,7 @@ export class DiagramNativeElement extends DiagramElement {
             this.contentSize.height = rect.height;
             let x: number = rect.x;
             let y: number = rect.y;
-            this.templatePosition = {x, y};
+            this.templatePosition = { x, y };
             this.isDirt = false;
         }
         if (this.width === undefined || this.height === undefined) {

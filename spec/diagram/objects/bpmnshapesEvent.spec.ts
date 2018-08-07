@@ -1,7 +1,7 @@
 import { createElement } from '@syncfusion/ej2-base';
 import { Diagram } from '../../../src/diagram/diagram';
 import { NodeModel } from '../../../src/diagram/objects/node-model';
-import { ShadowModel, RadialGradientModel, StopModel } from '../../../src/diagram/core/appearance-model';
+import { ShadowModel, RadialGradientModel, StopModel, LinearGradientModel } from '../../../src/diagram/core/appearance-model';
 import { Canvas } from '../../../src/diagram/core/containers/canvas';
 import { BpmnDiagrams } from '../../../src/diagram/objects/bpmn';
 Diagram.Inject(BpmnDiagrams);
@@ -15,6 +15,20 @@ describe('Diagram Control', () => {
         let shadow: ShadowModel = { angle: 135, distance: 10, opacity: 0.9 };
         let stops: StopModel[] = [{ color: 'white', offset: 0 }, { color: 'red', offset: 50 }];
         let gradient: RadialGradientModel = { cx: 50, cy: 50, fx: 50, fy: 50, stops: stops, type: 'Radial' };
+        let linearGradient: LinearGradientModel;
+            linearGradient = {
+                //Start point of linear gradient
+                x1: 0,
+                y1: 0,
+                //End point of linear gradient
+                x2: 50,
+                y2: 50,
+                //Sets an array of stop objects
+                stops: [{ color: "white", offset: 0 },
+                { color: "darkCyan", offset: 100 }
+                ],
+                type: 'Linear'
+            };
 
         let ele: HTMLElement;
         beforeAll((): void => {
@@ -22,7 +36,8 @@ describe('Diagram Control', () => {
             document.body.appendChild(ele);
             let node1: NodeModel = {
                 id: 'node7', width: 100, height: 100, offsetX: 100, offsetY: 100,
-                style: { fill: 'red', strokeColor: 'blue', strokeWidth: 5, },
+                 style: { fill: 'red', strokeColor: 'blue',gradient: linearGradient,
+                 strokeWidth: 5, },
                 shape: {
                     type: 'Bpmn', shape: 'Event',
                     event: { event: 'Start', trigger: 'Message' }
@@ -92,8 +107,11 @@ describe('Diagram Control', () => {
         });
 
         it('Checking event as Start and trigger as None', (done: Function) => {
+             let ele = document.getElementById("node7_0_event");
+            let value = ele.getAttribute("fill");
             let wrapper: Canvas = (diagram.nodes[0] as NodeModel).wrapper.children[0] as Canvas;
-            expect(wrapper.style.fill == 'transparent').toBe(true);
+            expect(value ===
+                "url(#node7_0_event_linear)" && wrapper.style.fill == 'transparent').toBe(true);
             expect(wrapper.style.strokeColor == 'transparent').toBe(true);
             expect((wrapper.children[0].actualSize.width === 100
                 && wrapper.children[0].actualSize.height === 100 &&

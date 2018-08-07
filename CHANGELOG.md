@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## 16.2.47 (2018-08-07)
+
+### Diagram
+
+#### Bug Fixes
+
+- Issue on applying gradient for BPMN shapes have fixed.
+- Issue on rendering diagram in IE browser have been fixed.
+- Issue on template binding for HTML and Native node have been fixed.
+
 ## 16.2.46 (2018-07-30)
 
 ### Diagram

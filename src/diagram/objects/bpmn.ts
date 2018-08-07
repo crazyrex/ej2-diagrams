@@ -359,6 +359,7 @@ export class BpmnDiagrams {
         //childNode1
         let outerEvtNode: PathElement = new PathElement();
         outerEvtNode.data = pathdata; outerEvtNode.id = id + '_1_event';
+        outerEvtNode.style.gradient = node.style.gradient;
         outerEvtNode.horizontalAlignment = 'Center';
         outerEvtNode.verticalAlignment = 'Center';
         outerEvtNode.relativeMode = 'Object';
@@ -566,6 +567,7 @@ export class BpmnDiagrams {
         let transactionEvents: Canvas = new Canvas();
         transactionEvents.id = node.id + '_transaction_events';
 
+        transactionEvents.style.gradient = node.style.gradient;
         let transaction: BpmnTransactionSubProcessModel = shape.activity.subProcess.transaction;
 
         this.getBPMNSubEvent(
