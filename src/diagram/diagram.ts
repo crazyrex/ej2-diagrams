@@ -664,6 +664,8 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
     public views: string[];
     /** @private */
     public isLoading: Boolean;
+    /** @private */
+    public enterObject: {} = {};
     /**
      * Constructor for creating the widget
      */
@@ -5000,11 +5002,13 @@ export class Diagram extends Component<HTMLElement> implements INotifyPropertyCh
                             };
                             this.triggerEvent(DiagramEvent.dragEnter, arg);
                             if (!this.activeLayer.lock && !arg.cancel) {
+                                this['enterObject'] = newObj;
                                 this.preventUpdate = true; this.initObject(newObj as IElement);
                                 this.currentSymbol = newObj as Node | Connector;
                                 if (this.mode !== 'SVG') {
                                     this.refreshDiagramLayer();
                                 }
+                                delete this['enterObject'] ;
                                 this.commandHandler.select(newObj);
                                 this.eventHandler.mouseDown(args.event);
                                 this.eventHandler.mouseMove(args.event, args);

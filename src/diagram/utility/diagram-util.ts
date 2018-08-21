@@ -36,6 +36,7 @@ import { DiagramHtmlElement } from '../core/elements/html-element';
 import { getRulerSize } from '../ruler/ruler';
 import { View } from '../objects/interface/interfaces';
 import { TransformFactor as Transforms } from '../interaction/scroller';
+import { SymbolPalette } from '../../symbol-palette/symbol-palette';
 
 
 
@@ -957,13 +958,33 @@ export function getElement(element: DiagramHtmlElement | DiagramNativeElement): 
     let instance: string = 'ej2_instances';
     let node: {} = {};
     let nodes: Object = diagramElement[instance][0].nodes;
+    if (nodes === undefined) {
+        nodes = getPaletteSymbols(diagramElement[instance][0]);
+    }
     let length: string = 'length';
     for (let i: number = 0; nodes && i < nodes[length]; i++) {
         if (nodes[i].id === element.nodeId) {
             return nodes[i];
         }
     }
+    if (diagramElement[instance][0].enterObject && diagramElement[instance][0].enterObject === element.nodeId) {
+        return diagramElement[instance][0].enterObject;
+    }
     return null;
+}
+
+/** @private */
+function getPaletteSymbols(symbolPalette: SymbolPalette): NodeModel[] {
+    let nodes: NodeModel[] = [];
+    for (let i: number = 0; i < symbolPalette.palettes.length; i++) {
+        let symbols: (NodeModel | ConnectorModel)[] = symbolPalette.palettes[i].symbols;
+        for (let j: number = 0; j < symbols.length; j++) {
+            if (symbols[j] instanceof Node) {
+                nodes.push(symbols[j] as NodeModel);
+            }
+        }
+    }
+    return nodes;
 }
 
 /**
