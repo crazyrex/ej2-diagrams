@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## 16.3.17 (2018-09-11)
+
+### Diagram
+
+#### Bug Fixes
+
+- Data binding for Native and HTML nodes not working has been fixed.
+- Issue with apply gradient for BPMN shapes has been fixed.
+- Issue with drop event argument has been fixed.
+- Image node issue in symbol palette has been fixed.
+
+#### New Features
+
+- Annotation interaction support has been added.
+- Rendering group node on symbol palette has been added.
+- Poly line connector tool support has been added.
+- Text annotation interaction support has been added.
+
 ## 16.2.47 (2018-08-07)
 
 ### Diagram

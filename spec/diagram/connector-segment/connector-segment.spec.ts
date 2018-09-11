@@ -2341,11 +2341,22 @@ describe('Diagram Control', () => {
                     { id: 'port4', offset: { x: 0.5, y: 1 } }]
                 }
                 ],
-                connectors: [{
-                    id: 'connector1', sourcePoint: { x: 320, y: 300 }, targetPoint: { x: 200, y: 100 }, type: 'Orthogonal',
-                    segments: [{ type: 'Orthogonal', direction: 'Top', length: 100 },
-                    { type: 'Orthogonal', direction: 'Left', length: 120 },]
-                },
+                connectors: [
+                    {
+                        id: 'connector1', sourcePoint: { x: 320, y: 300 }, targetPoint: { x: 200, y: 100 }, type: 'Orthogonal',
+                        segments: [{ type: 'Orthogonal', direction: 'Top', length: 100 },
+                        { type: 'Orthogonal', direction: 'Left', length: 120 },]
+                    },
+                    {
+                        id: 'connector2', sourcePoint: { x: 572, y: 40 }, targetPoint: { x: 600, y: 300 }, type: 'Orthogonal',
+                        segments: [{ type: 'Orthogonal', direction: 'Bottom', length: 200 },
+                        { type: 'Orthogonal', direction: 'Right', length: 120 },]
+                    },
+                    {
+                        id: 'connector3', sourcePoint: { x: 400, y: 142 }, targetPoint: { x: 600, y: 100 }, type: 'Orthogonal',
+                        segments: [{ type: 'Orthogonal', direction: 'Right', length: 260 },
+                        { type: 'Orthogonal', direction: 'Top', length: 120 },]
+                    }
                 ],
                 getConnectorDefaults: (obj: ConnectorModel) => {
                     let connector: ConnectorModel = {};
@@ -2378,6 +2389,38 @@ describe('Diagram Control', () => {
             mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.element.offsetLeft, diagram.nodes[0].offsetY + diagram.nodes[0].height / 2);
             expect(diagram.connectors[0].sourceID == 'node1' && diagram.connectors[0].sourcePortID == 'port4').toBe(true);
             mouseEvents.mouseUpEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.element.offsetLeft, diagram.nodes[0].offsetY + diagram.nodes[0].height / 2);
+            startX = diagram.connectors[0].sourcePoint.x;
+            startY = diagram.connectors[0].sourcePoint.y;
+            mouseEvents.mouseDownEvent(diagramCanvas, startX + diagram.element.offsetLeft, startY + diagram.element.offsetTop);
+            mouseEvents.mouseMoveEvent(diagramCanvas, startX + 1 + diagram.element.offsetLeft, diagram.nodes[0].offsetY);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.nodes[0].width / 2 + diagram.element.offsetLeft, diagram.nodes[0].offsetY + diagram.nodes[0].height / 2 + diagram.element.offsetTop);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.nodes[0].width / 2 + diagram.element.offsetLeft, diagram.nodes[0].offsetY);
+            expect(diagram.connectors[0].sourceID == 'node1' && diagram.connectors[0].sourcePortID == 'port3').toBe(true);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.element.offsetLeft, diagram.nodes[0].offsetY - diagram.nodes[0].height / 2);
+            expect(diagram.connectors[0].sourceID == 'node1' && diagram.connectors[0].sourcePortID == 'port2').toBe(true);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.element.offsetLeft, diagram.nodes[0].offsetY - diagram.nodes[0].height / 2 + diagram.element.offsetTop);
+            expect(diagram.connectors[0].sourceID == 'node1' && diagram.connectors[0].sourcePortID == '').toBe(true);
+            mouseEvents.mouseUpEvent(diagramCanvas, diagram.nodes[0].offsetX + diagram.element.offsetLeft, diagram.nodes[0].offsetY + diagram.nodes[0].height / 2);
+            done();
+        });
+
+        it('Checking source point to port (Opposite direction)', function(done) {
+            let mouseEvents: MouseEvents = new MouseEvents();
+            mouseEvents.clickEvent(diagramCanvas, 10 + diagram.element.offsetLeft, 10 + diagram.element.offsetTop);
+            diagram.select([diagram.connectors[1]]);
+            let startX = (diagram.connectors[1] as Connector).sourcePoint.x;
+            let startY = (diagram.connectors[1] as Connector).sourcePoint.y;
+            mouseEvents.mouseDownEvent(diagramCanvas, startX + diagram.element.offsetLeft, startY + diagram.element.offsetTop);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[1].offsetX + diagram.element.offsetLeft, diagram.nodes[1].offsetY - diagram.nodes[1].height / 2 );
+            expect(diagram.connectors[1].sourceID == 'node2' && diagram.connectors[1].sourcePortID == 'port2').toBe(true);
+            mouseEvents.mouseUpEvent(diagramCanvas, diagram.nodes[1].offsetX + diagram.element.offsetLeft, diagram.nodes[1].offsetY + diagram.nodes[1].height / 2);
+             diagram.select([diagram.connectors[2]]);
+            startX = (diagram.connectors[2] as Connector).sourcePoint.x;
+            startY = (diagram.connectors[2] as Connector).sourcePoint.y;
+            mouseEvents.mouseDownEvent(diagramCanvas, startX + diagram.element.offsetLeft, startY + diagram.element.offsetTop);
+            mouseEvents.mouseMoveEvent(diagramCanvas, diagram.nodes[1].offsetX - diagram.nodes[1].width/2 + 4, diagram.nodes[1].offsetY);
+            expect(diagram.connectors[2].sourceID == 'node2' && diagram.connectors[2].sourcePortID == 'port1').toBe(true);
+            mouseEvents.mouseUpEvent(diagramCanvas, diagram.nodes[1].offsetX + diagram.element.offsetLeft, diagram.nodes[1].offsetY + diagram.nodes[1].height / 2);
             done();
         });
 

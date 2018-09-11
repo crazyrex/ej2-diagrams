@@ -93,6 +93,14 @@ export class Point extends ChildProperty<Point> {
         return Math.sqrt(Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2));
     }
 
+    public static getLengthFromListOfPoints(points: PointModel[]): number {
+        let length: number = 0;
+        for (let j: number = 0; j < points.length - 1; j++) {
+            length += this.distancePoints(points[j], points[j + 1]);
+        }
+        return length;
+    }
+
     public static adjustPoint(source: PointModel, target: PointModel, isStart: boolean, length: number): PointModel {
         let pt: PointModel = isStart ? { x: source.x, y: source.y } : { x: target.x, y: target.y };
         let angle: number;

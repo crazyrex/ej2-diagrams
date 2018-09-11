@@ -15,6 +15,8 @@ export class TextElement extends DiagramElement {
      */
     public constructor() {
         super();
+        this.style.fill = 'transparent';
+        this.style.strokeColor = 'transparent';
     }
     /**
      * sets or gets the image source

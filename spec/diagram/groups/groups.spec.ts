@@ -7,8 +7,9 @@ import { UndoRedo } from '../../../src/diagram/objects/undo-redo';
 import { Snapping } from '../../../src/diagram/objects/snapping';
 import { MouseEvents } from '../../../spec/diagram/interaction/mouseevents.spec';
 import { DiagramContextMenu } from '../../../src/diagram/objects/context-menu';
-import { Node, SnapSettingsModel, DiagramElement } from '../../../src/diagram/index';
+import { Node, SnapSettingsModel, DiagramElement, ShapeAnnotationModel, PointPortModel } from '../../../src/diagram/index';
 import { SnapConstraints, PortVisibility, PortConstraints } from '../../../src/diagram/enum/enum';
+import { MenuItemModel } from '@syncfusion/ej2-navigations';
 Diagram.Inject(UndoRedo, DiagramContextMenu, Snapping);
 /**
  * Groups Spec
@@ -284,7 +285,7 @@ describe('Group', () => {
             (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
             let e = {
                 event: (diagram.contextMenuModule as any).eventArgs,
-                items: diagram.contextMenuModule.contextMenu.items[6].items,
+                items: (diagram.contextMenuModule.contextMenu.items[6] as MenuItemModel).items,
             };
             for (let i of e.items) {
                 if (i.id ===
@@ -310,7 +311,7 @@ describe('Group', () => {
             (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
             let e = {
                 event: (diagram.contextMenuModule as any).eventArgs,
-                items: diagram.contextMenuModule.contextMenu.items[6].items,
+                items: (diagram.contextMenuModule.contextMenu.items[6] as MenuItemModel).items,
             };
             for (let i of e.items) {
                 if (i.id ===
@@ -554,5 +555,87 @@ describe('Group', () => {
             done()
         });
 
+    });
+    describe('Group - width and height', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let scroller: DiagramScroller;
+        let mouseEvents: MouseEvents = new MouseEvents();
+
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagram_group_width_height' });
+            document.body.appendChild(ele);
+            let nodes: NodeModel[] = [
+                {
+                    id: 'node1', offsetX: 450, offsetY: 150, width: 100, height: 100,
+                }, {
+                    id: 'node2', width: 100, height: 100, offsetX: 550, offsetY: 250,
+                }, { id: 'group',ports:[{ id: 'port1', visibility: PortVisibility.Visible, shape: 'Circle', offset: { x: 0, y: 0.5 } }],
+                 children: ['node1', 'node2'],style: { fill: 'gray', strokeColor: "black" }, rotateAngle: 0, width: 40, height: 40 }
+            ];
+
+            diagram = new Diagram({
+                width: '800px', height: '600px', nodes: nodes,
+                snapSettings: { constraints: 0 }, contextMenuSettings: { show: true }
+            });
+            diagram.appendTo('#diagram_group_width_height');
+        });
+
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking group have width and height in rendering', (done: Function) => {
+            expect(Math.round(diagram.nodes[0].width) === 20 && Math.round(diagram.nodes[0].height) === 20 &&
+                Math.round(diagram.nodes[1].width) === 20 && Math.round(diagram.nodes[1].height) === 20 &&
+                diagram.nodes[2].width === 40 && diagram.nodes[2].height === 40 &&
+                diagram.nodes[2].offsetX === 500 && diagram.nodes[2].offsetY === 200).toBe(true);
+            done();
+        });
+        it('Update group width and height at run time', (done: Function) => {
+            var group1 = diagram.nodes[2];
+            group1.width = 100;
+            group1.height = 100;
+            diagram.dataBind();
+            expect(Math.round(diagram.nodes[0].width) === 50 && Math.round(diagram.nodes[0].height) === 50 &&
+                Math.round(diagram.nodes[1].width) === 50 && Math.round(diagram.nodes[1].height) === 50 &&
+                diagram.nodes[2].width === 100 && diagram.nodes[2].height === 100 &&
+                diagram.nodes[2].offsetX === 500 && diagram.nodes[2].offsetY === 200).toBe(true);
+            done();
+        });
+        it('group property issue and save and load isse', (done: Function) => {
+            var element: HTMLElement = document.getElementById("group_groupElement");
+            var group = element.childNodes[0];
+            expect(group.attributes[14].value === "gray" && group.attributes[11].value === "black").toBe(true);
+            let savedata = diagram.saveDiagram();
+            var group1 = diagram.nodes[2];
+            diagram.scale(group1, 1.2, 1.2, { x: 0, y: 0.5 });
+            var groupNode = diagram.nodes[2];
+            expect(groupNode.width === 120 && groupNode.height === 121).toBe(true);
+            done();
+        })
+         it('add and remove label issue', (done: Function) => {
+           let group1 = diagram.nodes[2] as Node;
+           let label: ShapeAnnotationModel[] = [{ id: 'label1', content: 'Label1', offset: { x: 0.5, y: 0.5 } },]
+           diagram.addLabels(group1, label);
+           let element: HTMLElement = document.getElementById("group_label1_groupElement");
+           expect((element.childNodes.length>0)).toBe(true);
+           diagram.removeLabels(group1, label);
+           let element1 = document.getElementById("group_label1_groupElement");
+           expect(!(element1.childNodes.length>0)).toBe(true);
+            done();
+        })
+        it('remove Port issue', (done: Function) => {
+            let group1 = diagram.nodes[2] as Node;
+            let port: PointPortModel[] = [
+                { id: 'port1', }, { id: 'port2', }, { id: 'port3', }, { id: 'port4', }
+            ]
+            let element: HTMLElement = document.getElementById("group_port1_groupElement");
+            expect((element.childNodes.length > 0)).toBe(true);
+            diagram.removePorts(group1, port);
+            var element1 = document.getElementById("group_port1_groupElement")
+            expect(!(element1.childNodes.length > 0)).toBe(true);
+            done();
+        })
     });
 });

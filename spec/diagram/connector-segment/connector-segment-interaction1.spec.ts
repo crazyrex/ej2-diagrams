@@ -1248,4 +1248,64 @@ describe('Diagram Control', () => {
         });
     });
 
+    describe('Conectors with multiple segments - Source Node Rotion', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'SourceNodeRotion' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [{
+                    id: 'NewIdea', width: 150, height: 60, offsetX: 300, offsetY: 60,
+                    shape: { type: 'Flow', shape: 'Terminator' },
+                    annotations: [{
+                        id: 'label1', content: 'New idea identified', offset: { x: 0.5, y: 0.5 }
+                    }],
+                }, {
+                    id: 'Meeting', width: 150, height: 60, offsetX: 500, offsetY: 300,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label2', content: 'Meeting with board', offset: { x: 0.5, y: 0.5 }
+                    }]
+                }],
+                connectors: [
+                    {
+                        id: 'connector1', type: 'Orthogonal', sourceID: 'NewIdea', targetID: 'Meeting',
+                        segments: [{ type: 'Orthogonal', direction: 'Bottom', length: 60 },
+                        { type: 'Orthogonal', direction: 'Right', length: 80 },
+                        { type: 'Orthogonal', direction: 'Bottom', length: 50 }]
+                    }
+                ],
+                getConnectorDefaults: (obj: ConnectorModel, diagram: Diagram) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#SourceNodeRotion');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+
+        it('Checking Multiple segment target dragging - Terminal segment have two points', (done: Function) => {
+            expect((diagram.connectors[0] as Connector).intermediatePoints[2].x == 380 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 150);
+            diagram.rotate(diagram.nodes[0], 65);
+            expect((diagram.connectors[0] as Connector).intermediatePoints[2].x == 380 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 150);
+            diagram.rotate(diagram.nodes[0], 120);
+            expect((diagram.connectors[0] as Connector).intermediatePoints[2].x == 380 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 150);
+            diagram.rotate(diagram.nodes[0], 210);
+            expect((diagram.connectors[0] as Connector).intermediatePoints[2].x == 380 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 150);
+            diagram.rotate(diagram.nodes[0], 270);
+            expect((diagram.connectors[0] as Connector).intermediatePoints[2].x == 380 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 150);
+            done();
+        });
+    });
+
 });

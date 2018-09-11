@@ -19,9 +19,28 @@ let getGradientType: Function = (obj: Gradient): Object => {
  */
 export class Thickness {
 
+    /**
+     * Sets the left value of the thickness
+     * @default 0
+     */
     public left: number;
+
+    /**
+     * Sets the right value of the thickness
+     * @default 0
+     */
     public right: number;
+
+    /**
+     * Sets the top value of the thickness
+     * @default 0
+     */
     public top: number;
+
+    /**
+     * Sets the bottom value of the thickness
+     * @default 0
+     */
     public bottom: number;
 
     constructor(left: number, right: number, top: number, bottom: number) {
@@ -67,6 +86,21 @@ export class Margin extends ChildProperty<Margin> {
 
 /**
  * Defines the Shadow appearance of the objects
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ *  let nodes: NodeModel[] = [{ id: 'node2', width: 100, height: 100,
+ *  constraints: NodeConstraints.Default | NodeConstraints.Shadow,
+ *  shadow: { angle: 45, distance: 5, opacity: 0.7, color: 'grey'}
+ * }];
+ * let diagram: Diagram = new Diagram({
+ * ...
+ *   nodes: nodes,
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
  */
 export class Shadow extends ChildProperty<Shadow> {
     /**
@@ -95,25 +129,45 @@ export class Shadow extends ChildProperty<Shadow> {
     public color: string;
 }
 
-
-/**       
- * Defines the stop of gradient
+/**
+ * Defines the different colors and the region of color transitions
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let stopscol: StopModel[] = [];
+ * let stops1: StopModel = { color: 'white', offset: 0, opacity: 0.7 };
+ * stopscol.push(stops1);
+ * let stops2: StopModel = { color: 'red', offset: 0, opacity: 0.3 };
+ * stopscol.push(stops2);
+ * let gradient: RadialGradientModel = { cx: 50, cy: 50, fx: 50, fy: 50, stops: stopscol, type: 'Radial' };
+ * let nodes: NodeModel[] = [{ id: 'node1', width: 100, height: 100,
+ * style: { gradient: gradient }
+ * }];
+ * let diagram: Diagram = new Diagram({
+ * ...
+ *   nodes: nodes,
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
  */
+
 export class Stop extends ChildProperty<Stop> {
     /**
-     * Defines the color of stop 
+     * Sets the color to be filled over the specified region
      * @default ''
      */
     @Property('')
     public color: string;
     /**
-     * Defines the offset of stop
+     * Sets the position where the previous color transition ends and a new color transition starts
      * @default 0
      */
     @Property(0)
     public offset: number;
     /**
-     * Defines the opacity of stop
+     * Describes the transparency level of the region
      * @default 1
      */
     @Property(1)
@@ -121,7 +175,7 @@ export class Stop extends ChildProperty<Stop> {
 }
 
 /**                                                                                                        
- * Defines the gradient of styles
+ * Paints the node with a smooth transition from one color to another color
  */
 export class Gradient extends ChildProperty<Gradient> {
     /**
@@ -132,6 +186,8 @@ export class Gradient extends ChildProperty<Gradient> {
     public stops: StopModel[];
     /**
      * Defines the type of gradient
+     * * Linear - Sets the type of the gradient as Linear
+     * * Radial - Sets the type of the gradient as Radial
      * @default 'None'
      */
     @Property('None')
@@ -146,8 +202,32 @@ export class Gradient extends ChildProperty<Gradient> {
 
 }
 
-/**                
+/**
  * Defines the linear gradient of styles
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let stopscol: StopModel[] = [];
+ * let stops1: StopModel = { color: 'white', offset: 0, opacity: 0.7 };
+ * stopscol.push(stops1);
+ * let stops2: StopModel = { color: 'red', offset: 0, opacity: 0.3 };
+ * stopscol.push(stops2);
+ * let gradient: LinearGradientModel = { x1: 0, x2: 50, y1: 0, y2: 50, stops: stopscol, type: 'Linear' };
+ * let nodes: NodeModel[] = [{ id: 'node1', width: 100, height: 100,
+ * style: { gradient: gradient }
+ * }];
+ * let diagram: Diagram = new Diagram({
+ * ...
+ *   nodes: nodes,
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
+ */
+
+/**                
+ * Paints the node with linear color transitions
  */
 export class LinearGradient extends Gradient {
     /**
@@ -175,8 +255,29 @@ export class LinearGradient extends Gradient {
     @Property(0)
     public y2: number;
 }
-/**                
- * Defines the radial gradient of styles
+
+/**
+ * A focal point defines the beginning of the gradient, and a circle defines the end point of the gradient
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let stopscol: StopModel[] = [];
+ * let stops1: StopModel = { color: 'white', offset: 0, opacity: 0.7 };
+ * stopscol.push(stops1);
+ * let stops2: StopModel = { color: 'red', offset: 0, opacity: 0.3 };
+ * stopscol.push(stops2);
+ * let gradient: RadialGradientModel = { cx: 50, cy: 50, fx: 50, fy: 50, stops: stopscol, type: 'Radial' };
+ * let nodes: NodeModel[] = [{ id: 'node1', width: 100, height: 100,
+ * style: { gradient: gradient }
+ * }];
+ * let diagram: Diagram = new Diagram({
+ * ...
+ *   nodes: nodes,
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
  */
 
 export class RadialGradient extends Gradient {
@@ -231,6 +332,21 @@ export class ShapeStyle extends ChildProperty<ShapeStyle> {
 
     /**
      * Defines the pattern of dashes and spaces to stroke the path/shape
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```
+     *  let nodes: NodeModel[] = [{  id: 'node', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     * style: { fill: 'red', strokeColor: 'blue', strokeWidth: 5, 
+     * strokeDashArray: '2 2', opacity: 0.6 } as ShapeStyleModel,
+     * }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     *   nodes: nodes,
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default ''
      */
     @Property('')
@@ -261,7 +377,7 @@ export class ShapeStyle extends ChildProperty<ShapeStyle> {
 
 
 /**
- * Defines the stroke style of a path
+ * Defines the stroke style of a path 
  */
 export class StrokeStyle extends ShapeStyle {
     /**
@@ -274,8 +390,29 @@ export class StrokeStyle extends ShapeStyle {
 
 /**
  * Defines the appearance of text
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let style: TextStyleModel = { strokeColor: 'black', opacity: 0.5, whiteSpace:'CollapseSpace', strokeWidth: 1 };
+ * let node: NodeModel;
+ * node = {
+ * ...
+ * id: 'node', width: 100, height: 100, offsetX: 100, offsetY: 100,
+ * annotations : [{
+ * content: 'text', style: style }];
+ * ...
+ * };
+ * let diagram: Diagram = new Diagram({
+ * ...
+ *   nodes: [node],
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
  */
 export class TextStyle extends ShapeStyle {
+
     /**
      * Sets the font color of a text
      * @default 'black'
@@ -313,6 +450,9 @@ export class TextStyle extends ShapeStyle {
 
     /**
      * Defines how the white space and new line characters have to be handled
+     * * PreserveAll - Preserves all empty spaces and empty lines
+     * * CollapseSpace - Collapses the consequent spaces into one
+     * * CollapseAll - Collapses all consequent empty spaces and empty lines
      * @default 'CollapseSpace'
      */
     @Property('CollapseSpace')
@@ -320,6 +460,9 @@ export class TextStyle extends ShapeStyle {
 
     /**
      * Defines how the text should be wrapped, when the text size exceeds some specific bounds
+     * * WrapWithOverflow - Wraps the text so that no word is broken
+     * * Wrap - Wraps the text and breaks the word, if necessary
+     * * NoWrap - Text will no be wrapped
      * @default  'WrapWithOverflow'
      */
     @Property('WrapWithOverflow')
@@ -327,6 +470,10 @@ export class TextStyle extends ShapeStyle {
 
     /**
      * Defines how the text should be aligned within its bounds
+     * * Left - Aligns the text at the left of the text bounds
+     * * Right - Aligns the text at the right of the text bounds
+     * * Center - Aligns the text at the center of the text bounds
+     * * Justify - Aligns the text in a justified manner
      * @default 'Center'
      */
     @Property('Center')
@@ -334,6 +481,10 @@ export class TextStyle extends ShapeStyle {
 
     /**
      * Defines how the text should be decorated. For example, with underline/over line
+     * * Overline - Decorates the text with a line above the text
+     * * Underline - Decorates the text with an underline
+     * * LineThrough - Decorates the text by striking it with a line
+     * * None - Text will not have any specific decoration
      * @default 'None'
      */
     @Property('None')
@@ -341,6 +492,9 @@ export class TextStyle extends ShapeStyle {
 
     /**
      * Defines how to handle the text when it exceeds the given size.
+     * * Wrap - Wraps the text to next line, when it exceeds its bounds
+     * * Ellipsis - It truncates the overflown text and represents the clipping with an ellipsis
+     * * Clip - It clips the overflow text
      * @default 'Wrap'
      */
     @Property('Wrap')

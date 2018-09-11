@@ -29,7 +29,7 @@ export abstract class NodeBase extends ChildProperty<NodeBase> {
     public zIndex: number;
 
     /**
-     * Defines the space to be let between the node and its immediate parent
+     * Defines the space to be left between the node and its immediate parent
      * @default {}
      */
     @Complex<MarginModel>({}, Margin)
@@ -51,7 +51,7 @@ export abstract class NodeBase extends ChildProperty<NodeBase> {
     public ports: PointPortModel[];
 
     /**
-     * Defines if the node is expanded or not
+     * Defines whether the node is expanded or not
      * @default true
      */
     @Property(true)
@@ -65,21 +65,21 @@ export abstract class NodeBase extends ChildProperty<NodeBase> {
     public tooltip: DiagramTooltipModel;
 
     /**
-     * Defines the properties of the Expand Icon
+     * Defines the expanded state of a node
      * @default {}
      */
     @Complex<IconShapeModel>({}, IconShape)
     public expandIcon: IconShapeModel;
 
     /**
-     * Defines the properties of the collapse Icon
+     * Defines the collapsed state of a node
      * @default {}
      */
     @Complex<IconShapeModel>({}, IconShape)
     public collapseIcon: IconShapeModel;
 
     /**
-     * Defines whether the node should be automatically positioned or not
+     * Defines whether the node should be automatically positioned or not. Applicable, if layout option is enabled.
      * @default false
      */
     @Property(false)

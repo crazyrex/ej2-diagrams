@@ -3,10 +3,12 @@ import { Point } from './../primitives/point';
 import { PointModel } from './../primitives/point-model';
 import { processPathData, pathSegmentCollection, getRectanglePath } from './../utility/path-util';
 import { overFlow } from './../utility/base-util';
+import { createHtmlElement } from './../utility/dom-util';
 import { PathSegment, ImageAttributes, StyleAttributes, BaseAttributes, LineAttributes, CircleAttributes } from './canvas-interface';
 import { LinearGradientModel, RadialGradientModel, StopModel } from './../core/appearance-model';
 import { RectAttributes, PathAttributes, TextAttributes, SubTextElement, TextBounds } from './canvas-interface';
 import { IRenderer } from './../rendering/IRenderer';
+
 /**
  * Canvas Renderer
  */
@@ -77,8 +79,7 @@ export class CanvasRenderer implements IRenderer {
     }
 
     public static createCanvas(id: string, width: number, height: number): HTMLCanvasElement {
-        let canvasObj: HTMLCanvasElement = document.createElement('canvas');
-        canvasObj.setAttribute('id', id);
+        let canvasObj: HTMLCanvasElement = createHtmlElement('canvas', { 'id': id }) as HTMLCanvasElement;
         this.setCanvasSize(canvasObj, width, height);
         return canvasObj;
     };
@@ -257,7 +258,7 @@ export class CanvasRenderer implements IRenderer {
                         let largeArc: boolean = seg.largeArc; let sweep: boolean = seg.sweep; let cp: PointModel = { x: x, y };
                         let currp: PointModel = {
                             x:
-                                Math.cos(xAxisRotation) * (curr.x - cp.x) / 2.0 + Math.sin(xAxisRotation) * (curr.y - cp.y) / 2.0,
+                            Math.cos(xAxisRotation) * (curr.x - cp.x) / 2.0 + Math.sin(xAxisRotation) * (curr.y - cp.y) / 2.0,
                             y: -Math.sin(xAxisRotation) * (curr.x - cp.x) / 2.0 + Math.cos(xAxisRotation) * (curr.y - cp.y) / 2.0
                         };
                         let l: number = Math.pow(currp.x, 2) / Math.pow(rx, 2) + Math.pow(currp.y, 2) / Math.pow(ry, 2);
@@ -276,7 +277,7 @@ export class CanvasRenderer implements IRenderer {
                         let cpp: PointModel = { x: s * rx * currp.y / ry, y: s * -ry * currp.x / rx };
                         let centp: PointModel = {
                             x:
-                                (curr.x + cp.x) / 2.0 + Math.cos(xAxisRotation) * cpp.x - Math.sin(xAxisRotation) * cpp.y,
+                            (curr.x + cp.x) / 2.0 + Math.cos(xAxisRotation) * cpp.x - Math.sin(xAxisRotation) * cpp.y,
                             y: (curr.y + cp.y) / 2.0 + Math.sin(xAxisRotation) * cpp.x + Math.cos(xAxisRotation) * cpp.y
                         };
                         let a1: number = this.a([1, 0], [(currp.x - cpp.x) / rx, (currp.y - cpp.y) / ry]);
@@ -293,7 +294,7 @@ export class CanvasRenderer implements IRenderer {
                         let ah: number = a1 + dir * (ad / 2.0);
                         let halfWay: PointModel = {
                             x:
-                                centp.x + rx * Math.cos(ah),
+                            centp.x + rx * Math.cos(ah),
                             y: centp.y + ry * Math.sin(ah)
                         };
                         seg.centp = centp; seg.xAxisRotation = xAxisRotation; seg.rx = rx;
@@ -405,13 +406,12 @@ export class CanvasRenderer implements IRenderer {
              * }
              */
             imageObj.onload = () => {
-            ctx.rotate(obj.angle * Math.PI / 180);
-            let image: HTMLImageElement = new Image();
-            image.src = obj.source;
-            this.image(ctx, image, obj.x, obj.y, obj.width, obj.height, obj);
-            ctx.rotate(-(obj.angle * Math.PI / 180));
+                ctx.rotate(obj.angle * Math.PI / 180);
+                let image: HTMLImageElement = new Image();
+                image.src = obj.source;
+                this.image(ctx, image, obj.x, obj.y, obj.width, obj.height, obj);
+                ctx.rotate(-(obj.angle * Math.PI / 180));
             };
-
             ctx.restore();
         }
     }
@@ -466,9 +466,8 @@ export class CanvasRenderer implements IRenderer {
                 let sHeight: number = srcHeight - y1;
                 let dWidth: number = resultWidth - (x1 * (resultWidth / srcWidth));
                 let dHeight: number = resultHeight - (y1 * (resultHeight / srcHeight));
-                let canvas1: HTMLCanvasElement = document.createElement('canvas');
-                canvas1.setAttribute('width', width.toString());
-                canvas1.setAttribute('height', height.toString());
+                let canvas1: HTMLCanvasElement = createHtmlElement(
+                    'canvas', { 'width': width.toString(), 'height': height.toString() }) as HTMLCanvasElement;
                 let ctx1: CanvasRenderingContext2D = canvas1.getContext('2d');
                 ctx1.drawImage(image, x1, y1, sWidth, sHeight, 0, 0, dWidth, dHeight);
                 ctx.drawImage(canvas1, x, y, width, height);
@@ -526,7 +525,7 @@ export class CanvasRenderer implements IRenderer {
 
 
     public labelAlign(text: TextAttributes, wrapBounds: TextBounds, childNodes: SubTextElement[]): PointModel {
-        let bounds: Size = new Size(wrapBounds.width, childNodes.length * (text.fontSize));
+        let bounds: Size = new Size(wrapBounds.width, childNodes.length * (text.fontSize * 1.2));
         let position: PointModel = { x: 0, y: 0 };
         let labelX: number = text.x;
         let labelY: number = text.y;

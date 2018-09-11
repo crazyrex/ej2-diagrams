@@ -7,24 +7,58 @@ export interface IconShapeModel {
 
     /**
      * Defines the shape of the icon.
+     * None
+     * Minus - sets the icon shape as minus
+     * Plus - sets the icon shape as Plus
+     * ArrowUp - sets the icon shape as ArrowUp
+     * ArrowDown - sets the icon shape as ArrowDown
+     * Template - sets the icon shape based on  the given  custom template
+     * Path - sets the icon shape based on the given  custom Path
      * @default 'None'
      */
     shape?: IconShapes;
 
     /**
-     * Sets the fill color of a icon.
+     * Sets the fill color of an icon.
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let nodes: NodeModel[] = [{
+     *           id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     *           annotations: [{ content: 'Default Shape' }],
+     *           expandIcon: { height: 20, width: 20, shape: "ArrowDown", fill: 'red' },
+     *           collapseIcon: { height: 20, width: 20, shape: "ArrowUp" },
+     *       }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     *  nodes: nodes,
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default 'white'
      */
     fill?: string;
 
     /**
      * Defines how the Icon has to be horizontally aligned.
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Left - Aligns the diagram element at the left of its immediate parent
+     * * Right - Aligns the diagram element at the right of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Auto'
      */
     horizontalAlignment?: HorizontalAlignment;
 
     /**
      * Defines how the Icon has to be Vertically aligned.
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Top - Aligns the diagram element at the top of its immediate parent
+     * * Bottom - Aligns the diagram element at the bottom of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Auto'
      */
     verticalAlignment?: VerticalAlignment;
@@ -48,7 +82,7 @@ export interface IconShapeModel {
     offset?: PointModel;
 
     /**
-     * Sets the border color of a icon.
+     * Sets the border color of an icon.
      * @default ''
      */
     borderColor?: string;
@@ -72,13 +106,13 @@ export interface IconShapeModel {
     pathData?: string;
 
     /**
-     * Defines the template
+     * Defines the custom content of the icon
      * @default ''
      */
     content?: string;
 
     /**
-     * Defines the corner radius for the icon
+     * Defines the corner radius of the icon border
      * @default 0
      */
     cornerRadius?: number;

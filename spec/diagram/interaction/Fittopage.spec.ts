@@ -101,4 +101,51 @@ describe('Diagram Control', () => {
             done();
         });
     });
+    describe('Multiple diagram', () => {
+        let diagram: Diagram; let diagram2: Diagram;
+        let ele: HTMLElement; let ele2: HTMLElement;
+
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'multiple_Diagram1' });
+            document.body.appendChild(ele);
+            ele2 = createElement('div', { id: 'multiple_Diagram2' });
+            document.body.appendChild(ele2);
+            let selArray: (NodeModel | ConnectorModel)[] = [];
+            let node: NodeModel = { id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100 };
+            diagram = new Diagram({
+                width: '500px', height: '300px', nodes: [node]
+            });
+            diagram.appendTo('#multiple_Diagram1');
+
+            diagram2 = new Diagram({
+                width: '500px', height: '300px', nodes: [node]
+            });
+            diagram2.appendTo('#multiple_Diagram2');
+        });
+
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+            diagram2.destroy();
+            ele2.remove();
+        });
+
+        it('Remove node from diagram 2', (done: Function) => {
+            debugger
+            expect(diagram2.nodes.length === 1).toBe(true);
+            expect(document.getElementById('multiple_Diagram2').querySelector('#' + 'node1_groupElement') !== null).toBe(true);
+            diagram2.remove(diagram2.nodes[0]);
+            expect(diagram2.nodes.length === 0).toBe(true);
+            expect(document.getElementById('multiple_Diagram2').querySelector('#' + 'node1_groupElement') === null).toBe(true);
+            done();
+        });
+        it('Remove node from diagram 1', (done: Function) => {
+            expect(diagram.nodes.length === 1).toBe(true);
+            expect(document.getElementById('multiple_Diagram1').querySelector('#' + 'node1_groupElement') !== null).toBe(true);
+            diagram.remove(diagram.nodes[0]);
+            expect(diagram.nodes.length === 0).toBe(true);
+            expect(document.getElementById('multiple_Diagram1').querySelector('#' + 'node1_groupElement') === null).toBe(true);
+            done();
+        });
+    });
 });

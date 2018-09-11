@@ -11,9 +11,11 @@ import { Direction } from './../enum/enum';
 import { contains } from './actions';
 import { SelectorModel } from './selector-model';
 import { MouseEventArgs } from './event-handlers';
-import { getOppositeDirection, Segment } from '../utility/connector';
+import { getOppositeDirection } from '../utility/connector';
 import { StraightSegment, BezierSegment, OrthogonalSegment } from '../objects/connector';
 import { ToolBase } from './tool';
+import { Corners } from '../core/elements/diagram-element';
+import { Segment } from './scroller';
 
 /**
  * Multiple segments editing for Connector
@@ -408,7 +410,7 @@ export class ConnectorEditing extends ToolBase {
 
     private updatePortSegment(prev: OrthogonalSegment, connector: ConnectorModel, index: number, tx: number, ty: number): void {
         if (index === 1 && prev.points.length === 2 && prev.length < 0) {
-            let source: Rect = (connector as Connector).sourceWrapper.corners;
+            let source: Corners = (connector as Connector).sourceWrapper.corners;
             let current: OrthogonalSegment = connector.segments[index] as OrthogonalSegment;
             let next: OrthogonalSegment = connector.segments[index + 1] as OrthogonalSegment;
             let newseg: OrthogonalSegmentModel;
@@ -508,7 +510,7 @@ export class ConnectorEditing extends ToolBase {
         let prev: OrthogonalSegment = connector.segments[index - 1] as OrthogonalSegment;
         let con: Connector = connector as Connector; let sourcePoint: PointModel;
         if (prev.length < 0 && connector.sourceID) {
-            let sourceNode: Rect = (connector as Connector).sourceWrapper.corners;
+            let sourceNode: Corners = (connector as Connector).sourceWrapper.corners;
             let segments: OrthogonalSegmentModel[] = []; let segValues: Object; let removeCurrentPrev: boolean = false;
             this.changeSegmentDirection(current);
             let next: OrthogonalSegment = connector.segments[index + 1] as OrthogonalSegment;
@@ -590,7 +592,7 @@ export class ConnectorEditing extends ToolBase {
 
         if (connector.targetID && connector.targetPortID === '') {
             let line1Start: PointModel; let line1End: PointModel; let line2Start: PointModel; let line2End: PointModel;
-            let corners: Rect = connector.targetWrapper.corners;
+            let corners: Corners = connector.targetWrapper.corners;
             let firstSegPoint: PointModel = selectedSegment.points[0];
             let lastSegPoint: PointModel = selectedSegment.points[selectedSegment.points.length - 1];
 
@@ -611,8 +613,8 @@ export class ConnectorEditing extends ToolBase {
                 line2Start = { x: corners.center.x - corners.width, y: corners.center.y };
                 line2End = { x: corners.center.x + corners.width, y: corners.center.y };
             }
-            let line1: Segment = { X1: line1Start.x, Y1: line1Start.y, X2: line1End.x, Y2: line1End.y };
-            let line2: Segment = { X1: line2Start.x, Y1: line2Start.y, X2: line2End.x, Y2: line2End.y };
+            let line1: Segment = { x1: line1Start.x, y1: line1Start.y, x2: line1End.x, y2: line1End.y };
+            let line2: Segment = { x1: line2Start.x, y1: line2Start.y, x2: line2End.x, y2: line2End.y };
             return (intersect3(line1, line2).enabled);
         }
         return false;

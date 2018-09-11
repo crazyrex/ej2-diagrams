@@ -368,8 +368,8 @@ describe('Diagram Control', () => {
         it('Checking orthogonal connection with flow shapes', (done: Function) => {
             let failure: boolean = false;
             let connector: ConnectorModel = diagram.connectors[0];
-            expect(connector.sourcePoint.x === 100 && connector.sourcePoint.y === 152.37 &&
-                connector.targetPoint.x === 200 && connector.targetPoint.y === 349.07).toBe(true);
+            expect(connector.sourcePoint.x === 51.72 && connector.sourcePoint.y === 200 &&
+                connector.targetPoint.x === 250 && connector.targetPoint.y === 300).toBe(true);
             done();
         });
     });
@@ -539,8 +539,8 @@ describe('Diagram Control', () => {
         it('Checking connections with node and right port', (done: Function) => {
             let failure: boolean = false;
             let connector: ConnectorModel = diagram.connectors[0];
-            expect(connector.sourcePoint.x === 100 && connector.sourcePoint.y === 152.37 &&
-                connector.targetPoint.x === 200 && connector.targetPoint.y === 349.07).toBe(true);
+            expect(connector.sourcePoint.x === 51.72 && connector.sourcePoint.y === 200 &&
+                connector.targetPoint.x === 250 && connector.targetPoint.y === 300).toBe(true);
             done();
         });
     });

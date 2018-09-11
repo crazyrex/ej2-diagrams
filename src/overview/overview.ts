@@ -3,7 +3,7 @@ import { RenderingMode } from '../diagram/enum/enum';
 import { DiagramRenderer } from '../diagram/rendering/renderer';
 import { CanvasRenderer } from '../diagram/rendering/canvas-renderer';
 import { INotifyPropertyChanged, Component, Property, Browser, EventHandler, Event, EmitType } from '@syncfusion/ej2-base';
-import { setAttributeHtml, setAttributeSvg } from '../diagram/utility/dom-util';
+import { setAttributeHtml, setAttributeSvg, createHtmlElement } from '../diagram/utility/dom-util';
 import { createSvgElement, getNativeLayer, hasClass } from '../diagram/utility/dom-util';
 import { Rect } from '../diagram/primitives/rect';
 import { Size } from '../diagram/primitives/size';
@@ -12,15 +12,28 @@ import { OverviewModel } from './overview-model';
 import { SvgRenderer } from '../diagram/rendering/svg-renderer';
 
 /**
- * Overview control
+ * Overview control allows you to see a preview or an overall view of the entire content of a Diagram.
+ * This helps you to look at the overall picture of a large Diagram
+ * To navigate, pan, or zoom, on a particular position of the page.
+ * ```html
+ * <div id='diagram'/>
+ * <div id="overview"></div>
  * ```
- * <div id='overview'/>
- * <script>
- *   var overview = new overview({ width:'250px', height:'500px', sourceID: 'diagram' });
- *   overview.appendTo('#overview');
- * </script>
+ * ```typescript
+ * let overview: Overview;
+ * let diagram: Diagram = new Diagram({
+ * width:'1000px', height:'500px' });
+ * diagram.appendTo('#diagram');
+ * let options: OverviewModel = {};
+ * options.sourceID = 'diagram';
+ * options.width = '250px';
+ * options.height = '500px';
+ * overview = new Overview(options);
+ * overview.appendTo('#overview');
  * ```
  */
+
+
 
 export class Overview extends Component<HTMLElement> implements INotifyPropertyChanged {
 
@@ -169,14 +182,14 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
     private renderCanvas(options?: OverviewModel): void {
         let canvas: HTMLElement = document.getElementById(this.element.id + '_canvas');
         if (!canvas) {
-            canvas = document.createElement('div');
+            canvas = createHtmlElement('div', {});
             this.element.appendChild(canvas);
         }
         let attribute: Object = {
             'id': this.element.id + '_canvas', 'class': 'drawing',
             'style': 'position:relative; height:' + this.getSizeValue(this.model.height) + '; width:' +
-                this.getSizeValue(this.model.width) +
-                ';style:-ms-touch-action: none;touch-action: none;'
+            this.getSizeValue(this.model.width) +
+            ';style:-ms-touch-action: none;touch-action: none;'
         };
         setAttributeHtml(canvas, attribute);
         this.element.setAttribute('tabindex', String(0));
@@ -192,7 +205,7 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
         if (this.parent) {
             let oldparent: Diagram = this.parent;
             this.parent = null;
-            oldparent.setOverview(null, this.id);
+            oldparent.setOverview(null, this.element.id);
             this.removeDocument(this);
         }
         this.parent = this.getDiagram(element, instance);
@@ -299,7 +312,7 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
         this.model.height = eHeight;
         let attributes: Object;
         if (!view.diagramLayerDiv) {
-            view.diagramLayerDiv = document.createElement('div');
+            view.diagramLayerDiv = createHtmlElement('div', {}) as HTMLDivElement;
             let container: HTMLElement = document.getElementById(this.element.id);
             view.diagramLayer = CanvasRenderer.createCanvas(this.element.id + '_diagramLayer', this.model.width, this.model.height);
             view.diagramLayer.setAttribute('style', 'position:absolute; left:0px;  top:0px ');
@@ -321,27 +334,24 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
         this.canvas.removeChild(svg);
         let htmlLayer: HTMLElement = document.getElementById(this.element.id + '_htmlLayer');
         this.canvas.removeChild(htmlLayer);
-        let diagramLayer: HTMLElement = document.getElementById(this.id + '_diagramLayer_div');
+        let diagramLayer: HTMLElement = document.getElementById(this.element.id + '_diagramLayer_div');
         this.canvas.removeChild(diagramLayer);
         view.diagramLayerDiv = null;
         view.diagramLayer = null;
     }
 
     private renderHtmlLayer(canvas: HTMLElement): HTMLElement {
-        let div: HTMLDivElement = document.createElement('div');
-        let attr: Object = { 'id': this.element.id + '_htmlLayer', 'class': 'e-html-layer' };
-        setAttributeHtml(div, attr);
-        let htmlLayer: HTMLDivElement = div;
-        div.style.pointerEvents = 'none';
-        div.style.position = 'absolute';
-        div.style.left = '0px';
-        div.style.top = '0px';
-        let htmlDiv: HTMLDivElement = document.createElement('div');
+        let htmlLayer: HTMLDivElement = createHtmlElement(
+            'div', {
+                'id': this.element.id + '_htmlLayer', 'class': 'e-html-layer',
+                'style': 'pointer-events:none;position:absolute;top:0px;left:0px;'
+            }
+        ) as HTMLDivElement;
         let options: Object = {
             'id': this.element.id + '_htmlLayer_div',
             'style': 'position:absolute;top:0px;left:0px;'
         };
-        setAttributeHtml(htmlDiv, options);
+        let htmlDiv: HTMLDivElement = createHtmlElement('div', options) as HTMLDivElement;
         htmlLayer.appendChild(htmlDiv);
         canvas.appendChild(htmlLayer);
         return htmlLayer;
@@ -371,7 +381,7 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
         });
         svg = createSvgElement('svg', attr);
         view.canvas.appendChild(svg);
-        let ovw: SVGElement = createSvgElement('g', { 'id': this.id + '_overviewlayer', 'style': 'pointer-events:none' });
+        let ovw: SVGElement = createSvgElement('g', { 'id': this.element.id + '_overviewlayer', 'style': 'pointer-events:none' });
         svg.appendChild(ovw);
         let rect: SVGElement = createSvgElement('rect', {
             'fill': 'transparent', 'width': '100%', 'height': '100%', 'class': 'overviewbackrect',
@@ -665,11 +675,11 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
         let htmlLayer: HTMLElement = document.getElementById(this.element.id + '_htmlLayer');
         htmlLayer.style.webkitTransform = 'scale(' + scale + ') translate(' + -bounds.x + 'px,' + (-bounds.y) + 'px)';
         htmlLayer.style.transform = 'scale(' + scale + ') translate(' + -bounds.x + 'px,' + (-bounds.y) + 'px)';
-        let ovw: HTMLElement = document.getElementById(this.id + '_overviewlayer');
+        let ovw: HTMLElement = document.getElementById(this.element.id + '_overviewlayer');
         ovw.setAttribute('transform', 'translate(' + (-bounds.x * scale) + ',' + (-bounds.y * scale) + ')');
         this.horizontalOffset = bounds.x * scale;
         this.verticalOffset = bounds.y * scale;
-        let canvas: HTMLElement = document.getElementById('overview_diagramLayer');
+        let canvas: HTMLElement = document.getElementById(this.element.id + '_diagramLayer');
         let nativeLayer: SVGElement = getNativeLayer(this.element.id);
         let context: CanvasRenderingContext2D = (canvas as HTMLCanvasElement).getContext('2d');
         let widthratio: number = (Number(this.model.width) / this.contentWidth);
@@ -890,7 +900,7 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
             'id': 'helper', x: x, y: y, width: width, height: height,
             'fill': 'transparent', 'stroke': 'gray', 'stroke-dasharray': '2 2', 'shape-rendering': 'crispEdges'
         });
-        let overviewLayer: SVGElement = (g as SVGSVGElement).getElementById(this.id + '_overviewlayer') as SVGElement;
+        let overviewLayer: SVGElement = (g as SVGSVGElement).getElementById(this.element.id + '_overviewlayer') as SVGElement;
         overviewLayer.appendChild(selectionRect);
         this.helper = selectionRect;
     }
@@ -937,7 +947,7 @@ export class Overview extends Component<HTMLElement> implements INotifyPropertyC
                 this.element.removeChild(content);
             }
         }
-        this.parent.views.splice(this.parent.views.indexOf(this.id), 1);
+        this.parent.views.splice(this.parent.views.indexOf(this.element.id), 1);
         this.diagramLayerDiv = null;
         this.canvas = null;
         this.parent = null;

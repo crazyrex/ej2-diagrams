@@ -26,13 +26,13 @@ export interface DataSourceModel {
     root?: string;
 
     /**
-     * Sets the parent id of the data source item
+     * Sets the unique id that defines the relationship between the data source items
      * @default ''
      */
     parentId?: string;
 
     /**
-     * Binds the custom data with node model
+     * Binds the custom data with the node model
      * @aspDefaultValueIgnore
      * @default undefined
      */

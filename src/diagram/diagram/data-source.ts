@@ -2,7 +2,33 @@ import { DataManager } from '@syncfusion/ej2-data';
 import { Property, ChildProperty } from '@syncfusion/ej2-base';
 
 /**
- * data source defines the basic unit of diagram
+ * Configures the data source that is to be bound with diagram
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let data: object[] = [
+ * { Name: "Elizabeth", Role: "Director" },
+ * { Name: "Christina", ReportingPerson: "Elizabeth", Role: "Manager" },
+ * { Name: "Yoshi", ReportingPerson: "Christina", Role: "Lead" },
+ * { Name: "Philip", ReportingPerson: "Christina", Role: "Lead" },
+ * { Name: "Yang", ReportingPerson: "Elizabeth", Role: "Manager" },
+ * { Name: "Roland", ReportingPerson: "Yang", Role: "Lead" },
+ * { Name: "Yvonne", ReportingPerson: "Yang", Role: "Lead" }
+ * ];
+ * let items: DataManager = new DataManager(data as JSON[]);
+ * let diagram: Diagram = new Diagram({
+ * ...
+ * layout: {
+ *             type: 'OrganizationalChart'
+ * },
+ * dataSourceSettings: {
+ * id: 'Name', parentId: 'ReportingPerson', dataManager: items,
+ * }
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
  */
 
 export class DataSource extends ChildProperty<DataSource> {
@@ -30,14 +56,14 @@ export class DataSource extends ChildProperty<DataSource> {
     public root: string;
 
     /**
-     * Sets the parent id of the data source item
+     * Sets the unique id that defines the relationship between the data source items
      * @default ''
      */
     @Property('')
     public parentId: string;
 
     /**
-     * Binds the custom data with node model
+     * Binds the custom data with the node model
      * @aspDefaultValueIgnore
      * @default undefined
      */

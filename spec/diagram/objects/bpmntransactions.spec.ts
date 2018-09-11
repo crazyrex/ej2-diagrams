@@ -101,6 +101,8 @@ describe('Diagram Control', () => {
             (diagram.nodes[0].shape as BpmnShape).activity.subProcess.transaction.success.visible = false;
             (diagram.nodes[0].shape as BpmnShape).activity.subProcess.transaction.failure.visible = false;
             (diagram.nodes[0].shape as BpmnShape).activity.subProcess.transaction.cancel.visible = false;
+            diagram.nodes[0].style.strokeColor = 'red';
+            diagram.nodes[0].style.opacity = 0.5;
             diagram.dataBind();
             let connector: Connector = diagram.connectors[0] as Connector;
             expect(connector.sourceWrapper.id == 'node_boundary').toBe(true);

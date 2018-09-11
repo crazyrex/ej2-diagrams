@@ -21,27 +21,28 @@ describe('Diagram Control', () => {
         { source: { x: 350, y: 300 }, target: { x: 450, y: 300 } }];
 
     let lowerDistance: object[] = [
-        { source: { x: 300, y: 250 }, target: { x: 406.07, y: 456.07 } },
-        { source: { x: 300, y: 250 }, target: { x: 193.93, y: 456.07 } },
-        { source: { x: 300, y: 250 }, target: { x: 193.93, y: 243.93 } },
-        { source: { x: 300, y: 250 }, target: { x: 406.07, y: 243.93 } }];
+        { source: { x: 250, y: 300 }, target: { x: 456.07, y: 406.07 } },
+        { source: { x: 350, y: 300 }, target: { x: 143.93, y: 406.07 } },
+        { source: { x: 350, y: 300 }, target: { x: 143.93, y: 193.93 } },
+        { source: { x: 250, y: 300 }, target: { x: 456.07, y: 193.93 } }];
 
     let lowerDistance2: object[] = [
-        { source: { x: 406.07, y: 356.07 }, target: { x: 300, y: 350 } },
-        { source: { x: 193.93, y: 356.07 }, target: { x: 300, y: 350 } },
-        { source: { x: 193.93, y: 143.93 }, target: { x: 300, y: 350 } },
-        { source: { x: 406.07, y: 143.93 }, target: { x: 300, y: 350 } }];
+        { source: { x: 456.07, y: 406.07 }, target: { x: 250, y: 300 } },
+        { source: { x: 143.93, y: 406.07 }, target: { x: 350, y: 300 } },
+        { source: { x: 143.93, y: 193.93 }, target: { x: 350, y: 300 } },
+        { source: { x: 456.07, y: 193.93 }, target: { x: 250, y: 300 } }];
 
     let overlapped: object[] = [
-        { source: { x: 200, y: 150 }, target: { x: 300, y: 350 } },
-        { source: { x: 500, y: 150 }, target: { x: 575, y: 325 } },
-        { source: { x: 800, y: 150 }, target: { x: 850, y: 300 } },
-        { source: { x: 200, y: 450 }, target: { x: 225, y: 575 } },
+        { source: { x: 150, y: 200 }, target: { x: 350, y: 300 } },
+        { source: { x: 450, y: 200 }, target: { x: 625, y: 275 } },
+        { source: { x: 750, y: 200 }, target: { x: 900, y: 250 } },
+        { source: { x: 150, y: 500 }, target: { x: 275, y: 525 } },
         { source: { x: 500, y: 450 }, target: { x: 500, y: 575 } },
-        { source: { x: 800, y: 450 }, target: { x: 700, y: 650 } },
-        { source: { x: 200, y: 850 }, target: { x: 125, y: 1025 } },
-        { source: { x: 500, y: 850 }, target: { x: 450, y: 1000 } },
-        { source: { x: 800, y: 850 }, target: { x: 775, y: 975 } }];
+        { source: { x: 850, y: 500 }, target: { x: 650, y: 600 } },
+        { source: { x: 250, y: 900 }, target: { x: 75, y: 975 } },
+        { source: { x: 550, y: 900 }, target: { x: 400, y: 950 } },
+        { source: { x: 850, y: 900 }, target: { x: 725, y: 925 } }];
+
 
     let x: string = 'x';
     let y: string = 'y';
@@ -71,10 +72,10 @@ describe('Diagram Control', () => {
             for (let i: number = 0; i < 8; i++) {
                 let newPoint: PointModel = Point.transform(sourcePt, angle, distance);
                 nodes.push({
-                    id: 'target ' + i, width: 100, height: 100, offsetX: newPoint.x, offsetY: newPoint.y,
+                    id: 'target_' + i, width: 100, height: 100, offsetX: newPoint.x, offsetY: newPoint.y,
                     style: { opacity: 0.5 }
                 });
-                connectors.push({ sourceID: 'node1', targetID: 'target ' + i, type: 'Orthogonal' });
+                connectors.push({ sourceID: 'node1', targetID: 'target_' + i, type: 'Orthogonal' });
                 angle += 45;
             }
 
@@ -126,9 +127,8 @@ describe('Diagram Control', () => {
         it('Docking rotated nodes', (done: Function) => {
             diagram.nodes[0].rotateAngle = 45;
             diagram.dataBind();
-            expect(diagram.connectors[0].targetPoint.x == 300
-                && diagram.connectors[0].targetPoint.y == 370.71).toBe(true
-                );
+            expect(diagram.connectors[0].targetPoint.x == 335.36
+                && (diagram.connectors[0].targetPoint.y == 335.35 || diagram.connectors[0].targetPoint.y == 335.36)).toBe(true);
             done();
             diagram.nodes[0].rotateAngle = 0;
         });
@@ -222,10 +222,10 @@ describe('Diagram Control', () => {
             for (let i: number = 0; i < 8; i++) {
                 let newPoint: PointModel = Point.transform(sourcePt, angle, distance);
                 nodes.push({
-                    id: 'target ' + i, width: 100, height: 100, offsetX: newPoint.x, offsetY: newPoint.y,shape:shape2,
+                    id: 'target_' + i, width: 100, height: 100, offsetX: newPoint.x, offsetY: newPoint.y,shape:shape2,
                     style: { opacity: 0.5 }
                 });
-                connectors.push({ sourceID: 'node1', targetID: 'target ' + i, type: 'Orthogonal' });
+                connectors.push({ sourceID: 'node1', targetID: 'target_' + i, type: 'Orthogonal' });
                 angle += 45;
             }
 

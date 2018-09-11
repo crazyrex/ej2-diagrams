@@ -1,4 +1,3 @@
-import { createElement } from '@syncfusion/ej2-base';
 import { Browser } from '@syncfusion/ej2-base';
 import { CanvasRenderer } from './rendering/canvas-renderer';
 import { DiagramRenderer } from './rendering/renderer';
@@ -6,7 +5,7 @@ import { ConnectorModel } from './objects/connector-model';
 import { NodeModel, ImageModel } from './objects/node-model';
 import { Size } from './primitives/size';
 import { DiagramRegions } from './enum/enum';
-import { setAttributeHtml, setAttributeSvg } from './utility/dom-util';
+import { setAttributeHtml, setAttributeSvg, createHtmlElement } from './utility/dom-util';
 import { Rect } from './primitives/rect';
 import { MarginModel } from './core/appearance-model';
 import { createSvgElement, getHTMLLayer } from './utility/dom-util';
@@ -95,10 +94,9 @@ export class PrintAndExport {
                 if (Browser.info.name === 'msie') {
                     window.navigator.msSaveOrOpenBlob(blob, fileName + '.' + fileType);
                 } else {
-                    let pom: HTMLAnchorElement = document.createElement('a');
+                    let pom: HTMLAnchorElement = createHtmlElement('a', { 'download': fileName + '.' + fileType }) as HTMLAnchorElement;
                     let url: string = URL.createObjectURL(blob);
                     pom.href = url;
-                    pom.setAttribute('download', fileName + '.' + fileType);
                     let e: MouseEvent = document.createEvent('MouseEvents');
                     e.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
                     pom.dispatchEvent(e);
@@ -149,13 +147,11 @@ export class PrintAndExport {
                 left: !isNaN(margin.left) ? margin.left : 0,
                 right: !isNaN(margin.right) ? margin.right : 0
             };
-            let img: HTMLImageElement = document.createElement('img');
             let attr: Object = {
                 'id': this.diagram.element.id + '_printImage',
                 'src': image,
             };
-            img.setAttribute('id', this.diagram.element.id + '_printImage');
-            setAttributeHtml(img, attr);
+            let img: HTMLImageElement = createHtmlElement('img', attr) as HTMLImageElement;
             img.onload = () => {
                 images = this.getMultipleImage(img, options, true);
                 this.exportImage(images, fileName, fileType, image);
@@ -194,10 +190,9 @@ export class PrintAndExport {
             if (Browser.info.name === 'msie') {
                 window.navigator.msSaveOrOpenBlob(b, fileName + '.' + fileType);
             } else {
-                let htmlElement: HTMLAnchorElement = document.createElement('a');
+                let htmlElement: HTMLAnchorElement = createHtmlElement('a', {'download': fileName + '.' + fileType}) as HTMLAnchorElement;
                 let urlLink: string = URL.createObjectURL(b);
                 htmlElement.href = urlLink;
-                htmlElement.setAttribute('download', fileName + '.' + fileType);
                 let mouseEvent: MouseEvent = document.createEvent('MouseEvents');
                 mouseEvent.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
                 setTimeout(
@@ -477,7 +472,7 @@ export class PrintAndExport {
     }
     private getMultipleImage(img: HTMLImageElement, options: IExportOptions, isExport?: boolean): HTMLElement | string[] {
         let imageArray: string[] = [];
-        let div: HTMLElement = document.createElement('div');
+        let div: HTMLElement = createHtmlElement('div', {}) as HTMLDivElement;
         let pageSize: Size = this.getPrintCanvasStyle(img, options);
         let pageWidth: number;
         let pageHeight: number;
@@ -567,12 +562,9 @@ export class PrintAndExport {
     }
 
     private printImage(div: HTMLElement, url: string, i: string | number, pageWidth?: string, pageHeight?: string): void {
-        let img: HTMLImageElement = document.createElement('img');
-        let attr: Object;
-        let innerDiv: HTMLDivElement = document.createElement('div');
-        attr = { 'class': 'e-diagram-print-page', 'style': 'width:' + pageWidth + 'height:' + pageHeight };
-        setAttributeHtml(img, attr);
-        setAttributeHtml(innerDiv, attr);
+        let attr: Object = { 'class': 'e-diagram-print-page', 'style': 'width:' + pageWidth + 'height:' + pageHeight };
+        let img: HTMLImageElement = createHtmlElement('img', attr) as HTMLImageElement;
+        let innerDiv: HTMLDivElement = createHtmlElement('div', attr) as HTMLDivElement;
         attr = { 'id': this.diagram.element.id + '_multiplePrint_img' + i, 'style': 'float:left', 'src': url };
         setAttributeHtml(img, attr);
         innerDiv.appendChild(img);
@@ -588,12 +580,11 @@ export class PrintAndExport {
         options.mode = 'Data';
         options.margin = { top: 0, bottom: 0, right: 0, left: 0 };
         let url: string | SVGElement = this.exportDiagram(options);
-        let img: HTMLImageElement = document.createElement('img');
         let attr: Object = {
             'id': this.diagram.element.id + '_printImage',
             'src': url,
         };
-        setAttributeHtml(img, attr);
+        let img: HTMLImageElement = createHtmlElement('img', attr) as HTMLImageElement;
         img.onload = () => {
             let div: HTMLElement | string[] = this.getMultipleImage(img, options);
             // specify window parameters

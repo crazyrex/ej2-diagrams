@@ -1,7 +1,7 @@
 import { createElement } from '@syncfusion/ej2-base';
 import { Diagram } from '../../../src/diagram/diagram';
 import { NodeModel } from '../../../src/diagram/objects/node-model';
-import { ShadowModel, RadialGradientModel, StopModel, LinearGradientModel } from '../../../src/diagram/core/appearance-model';
+import { ShadowModel, RadialGradientModel, StopModel,LinearGradientModel } from '../../../src/diagram/core/appearance-model';
 import { Canvas } from '../../../src/diagram/core/containers/canvas';
 import { BpmnDiagrams } from '../../../src/diagram/objects/bpmn';
 Diagram.Inject(BpmnDiagrams);
@@ -36,7 +36,7 @@ describe('Diagram Control', () => {
             document.body.appendChild(ele);
             let node1: NodeModel = {
                 id: 'node7', width: 100, height: 100, offsetX: 100, offsetY: 100,
-                 style: { fill: 'red', strokeColor: 'blue',gradient: linearGradient,
+                style: { fill: 'red', strokeColor: 'blue',gradient: linearGradient,
                  strokeWidth: 5, },
                 shape: {
                     type: 'Bpmn', shape: 'Event',
@@ -107,7 +107,7 @@ describe('Diagram Control', () => {
         });
 
         it('Checking event as Start and trigger as None', (done: Function) => {
-             let ele = document.getElementById("node7_0_event");
+            let ele = document.getElementById("node7_0_event");
             let value = ele.getAttribute("fill");
             let wrapper: Canvas = (diagram.nodes[0] as NodeModel).wrapper.children[0] as Canvas;
             expect(value ===

@@ -1054,33 +1054,33 @@ describe('Diagram Control', () => {
         });
 
         it('Checking Top to Bottom connection - third segment(direction - left) overlap to target node', (done: Function) => {
-            expect((diagram.connectors[0] as Connector).intermediatePoints.length == 6 && (diagram.connectors[0] as Connector).intermediatePoints[0].x == 450 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 65 &&
-                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 450 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 45 &&
-                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 205 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 45 &&
+            expect((diagram.connectors[0] as Connector).intermediatePoints.length == 6 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[0].x == 525 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 95 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 545 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 95 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 545 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 205 &&
                 (diagram.connectors[0] as Connector).intermediatePoints[3].x == 205 && (diagram.connectors[0] as Connector).intermediatePoints[3].y == 205 &&
-                (diagram.connectors[0] as Connector).intermediatePoints[4].x == 300 && (diagram.connectors[0] as Connector).intermediatePoints[4].y == 205 &&
-                (diagram.connectors[0] as Connector).intermediatePoints[5].x == 300 && (diagram.connectors[0] as Connector).intermediatePoints[5].y == 185).toBe(true);
+                (diagram.connectors[0] as Connector).intermediatePoints[4].x == 205 && (diagram.connectors[0] as Connector).intermediatePoints[4].y == 155 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[5].x == 225 && (diagram.connectors[0] as Connector).intermediatePoints[5].y == 155).toBe(true);
             done();
         });
         it('Checking Top to Bottom connection - source node is overlap to target node', (done: Function) => {
             expect((diagram.connectors[1] as Connector).intermediatePoints.length == 6 &&
-                (diagram.connectors[1] as Connector).intermediatePoints[0].x == 796 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 187 &&
-                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 796 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 207 &&
-                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 700 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 207 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[0].x == 871 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 157 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 891 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 157 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 891 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 48 &&
                 (diagram.connectors[1] as Connector).intermediatePoints[3].x == 700 && (diagram.connectors[1] as Connector).intermediatePoints[3].y == 48 &&
-                (diagram.connectors[1] as Connector).intermediatePoints[4].x == 795 && (diagram.connectors[1] as Connector).intermediatePoints[4].y == 48 &&
-                (diagram.connectors[1] as Connector).intermediatePoints[5].x == 795 && (diagram.connectors[1] as Connector).intermediatePoints[5].y == 68).toBe(true);
+                (diagram.connectors[1] as Connector).intermediatePoints[4].x == 700 && (diagram.connectors[1] as Connector).intermediatePoints[4].y == 98 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[5].x == 720.4 && (diagram.connectors[1] as Connector).intermediatePoints[5].y == 98).toBe(true);
             done();
         });
         it('Checking Top to Bottom connection - third segment(direction-Right) overlap to target node', (done: Function) => {
-            expect((diagram.connectors[2] as Connector
-            ).intermediatePoints.length == 6 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[0].x == 300 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 236.05 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 300 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 216.05 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 545 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 216.05 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 545 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 350 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[4].x == 450 && (diagram.connectors[2] as Connector).intermediatePoints[4].y == 350 &&
-                (diagram.connectors[2] as Connector).intermediatePoints[5].x == 450 && (diagram.connectors[2] as Connector).intermediatePoints[5].y == 330).toBe(true);
+            expect((diagram.connectors[2] as Connector).intermediatePoints.length == 6 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[0].x == 228.87 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 290 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 208.87 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 290 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 208.87 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 365 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 545 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 365 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[4].x == 545 && (diagram.connectors[2] as Connector).intermediatePoints[4].y == 300 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[5].x == 525 && (diagram.connectors[2] as Connector).intermediatePoints[5].y == 300).toBe(true);
             done();
         });
     });

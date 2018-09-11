@@ -19,6 +19,7 @@ import { DiagramRenderer } from '../rendering/renderer';
 import { LineAttributes, PathAttributes } from '../rendering/canvas-interface';
 import { getAdornerLayerSvg } from './../utility/dom-util';
 import { isSelected } from '../interaction/actions';
+import { TextElement } from '../core/elements/text-element';
 
 /**
  * Snapping
@@ -55,7 +56,7 @@ export class Snapping {
             snapLine = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             snapLine.setAttribute('id', '_SnappingLines');
             snapLine.setAttribute('shapeRendering', 'crispEdges');
-            getAdornerLayerSvg(this.diagram.element.id).appendChild(snapLine);
+            this.getAdornerLayerSvg().appendChild(snapLine);
             this.snapObject(
                 diagram, selectedObject, snapLine, horizontallysnapped, verticallysnapped, delta, startPoint === endPoint);
         }
@@ -496,7 +497,7 @@ export class Snapping {
      */
     public snapBottom(
         horizontalSnap: Snap, verticalSnap: Snap, snapLine: SVGElement, deltaX: number, deltaY: number,
-        shape: SelectorModel, ended: boolean, initialRect: Rect): number {
+        shape: SelectorModel | DiagramElement, ended: boolean, initialRect: Rect): number {
         let dify: number = deltaY;
         verticalSnap.bottom = true;
         horizontalSnap.left = horizontalSnap.right = false;
@@ -508,7 +509,8 @@ export class Snapping {
             y = initialRect.y + initialRect.height * (1 - shape.pivot.y) + deltaY - (shape.offsetY + shape.height * (1 - shape.pivot.y));
             this.snapSize(this.diagram, horizontalSnap, verticalSnap, snapLine, deltaX, y, this.diagram.selectedItems, ended);
         }
-        let bounds: Rect = getBounds(shape.wrapper);
+        let bounds: Rect;
+        bounds = (shape instanceof TextElement) ? getBounds(shape as DiagramElement) : getBounds((shape as SelectorModel).wrapper);
         if (!verticalSnap.snapped) {
             if (this.diagram.snapSettings.constraints & SnapConstraints.SnapToHorizontalLines) {
                 let bottom: number = initialRect.y + initialRect.height * (1 - shape.pivot.y);
@@ -750,7 +752,7 @@ export class Snapping {
                 start = { x: crnt.x + crnt.width, y: top - 15 };
                 end = { x: next.x, y: top - 15 };
                 this.renderSpacingLines(
-                    start, end, g, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                    start, end, g, this.getAdornerLayerSvg(), diagram.scroller.transform);
             }
         }
     }
@@ -770,7 +772,7 @@ export class Snapping {
                 start = { x: right + 15, y: crnt.y + crnt.height };
                 end = { x: right + 15, y: next.y };
                 this.renderSpacingLines(
-                    start, end, g, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                    start, end, g, this.getAdornerLayerSvg(), diagram.scroller.transform);
             }
         }
     }
@@ -799,13 +801,13 @@ export class Snapping {
             startPt = { x: bounds.x + target.offset, y: bounds.y - 15 };
             endPt = { x: bounds.x + bounds.width + target.offset, y: bounds.y - 15 };
             this.renderSpacingLines(
-                startPt, endPt, snapLine, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                startPt, endPt, snapLine, this.getAdornerLayerSvg(), diagram.scroller.transform);
             for (i = 0; i < sameSizes.length; i++) {
                 bounds = ((sameSizes[i].source) as DiagramElement).bounds;
                 startPt = { x: bounds.x, y: bounds.y - 15 };
                 endPt = { x: bounds.x + bounds.width, y: bounds.y - 15 };
                 this.renderSpacingLines(
-                    startPt, endPt, snapLine, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                    startPt, endPt, snapLine, this.getAdornerLayerSvg(), diagram.scroller.transform);
             }
         }
         horizontalSnap.offset = target.offset;
@@ -838,13 +840,13 @@ export class Snapping {
             start = { x: bounds.x + bounds.width + 15, y: bounds.y + target.offset };
             end = { x: bounds.x + bounds.width + 15, y: bounds.y + target.offset + bounds.height };
             this.renderSpacingLines(
-                start, end, snapLine, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                start, end, snapLine, this.getAdornerLayerSvg(), diagram.scroller.transform);
             for (i = 0; i < sameSizes.length; i++) {
                 bounds = ((sameSizes[i].source) as DiagramElement).bounds;
                 start = { x: bounds.x + bounds.width + 15, y: bounds.y };
                 end = { x: bounds.x + bounds.width + 15, y: bounds.y + bounds.height };
                 this.renderSpacingLines(
-                    start, end, snapLine, getAdornerLayerSvg(this.diagram.element.id), diagram.scroller.transform);
+                    start, end, snapLine, this.getAdornerLayerSvg(), diagram.scroller.transform);
             }
         }
         verticalSnap.offset = target.offset;
@@ -899,7 +901,7 @@ export class Snapping {
                 endPoint: { x: end.x + 8, y: end.y + 1 },
                 stroke: '#07EDE1',
                 strokeWidth: 1, fill: '#07EDE1', dashArray: '', width: 1, x: 0, y: 0, height: 0, angle: 0, pivotX: 0,
-                pivotY: 0, visible: true, opacity: 1, id: getAdornerLayerSvg(this.diagram.element.id).id + 'spacing'
+                pivotY: 0, visible: true, opacity: 1, id: this.getAdornerLayerSvg().id + 'spacing'
             };
             this.line.push(line1);
             this.diagram.diagramRenderer.drawLine(snapLine, this.line.pop());
@@ -1107,15 +1109,18 @@ export class Snapping {
         return ((((bounds.x < (child.x + child.width)) && (child.x < (bounds.x + bounds.width)))
             && (bounds.y < (child.y + child.height))) && (child.y < (bounds.y + bounds.height)));
     }
+    private getAdornerLayerSvg(): SVGSVGElement {
+        return this.diagram.diagramRenderer.adornerSvgLayer;
+    }
     /**
      * To remove grid lines on mouse move and mouse up
      * @private
      */
     public removeGuidelines(diagram: Diagram): void {
         let selectionRect: SVGElement =
-            (getAdornerLayerSvg(this.diagram.element.id) as SVGSVGElement).getElementById('_SnappingLines') as SVGElement;
+            (this.getAdornerLayerSvg() as SVGSVGElement).getElementById('_SnappingLines') as SVGElement;
         let line: SVGElement =
-            (getAdornerLayerSvg(this.diagram.element.id) as SVGSVGElement).getElementById('pivotLine') as SVGElement;
+            (this.getAdornerLayerSvg() as SVGSVGElement).getElementById('pivotLine') as SVGElement;
         if (selectionRect) {
             selectionRect.parentNode.removeChild(selectionRect);
         }
@@ -1264,7 +1269,7 @@ export class Snapping {
             snapLine = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             snapLine.setAttribute('id', '_SnappingLines');
             snapLine.setAttribute('shapeRendering', 'crispEdges');
-            getAdornerLayerSvg(this.diagram.element.id).appendChild(snapLine);
+            this.getAdornerLayerSvg().appendChild(snapLine);
         }
         return snapLine;
     }

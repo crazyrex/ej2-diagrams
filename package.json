@@ -1,20 +1,20 @@
 {
   "name": "@syncfusion/ej2-diagrams",
-  "version": "16.2.50",
-  "description": "Essential JS 2 Diagram Components",
+  "version": "16.3.17",
+  "description": "Feature-rich diagram control to create diagrams like flow charts, organizational charts, mind maps, and BPMN diagrams. Its rich feature set includes built-in shapes, editing, serializing, exporting, printing, overview, data binding, and automatic layouts.",
   "author": "Syncfusion Inc.",
   "license": "SEE LICENSE IN license",
   "main": "./dist/ej2-diagrams.umd.min.js",
   "module": "./index.js",
   "es2015": "./dist/es6/ej2-diagrams.es2015.js",
   "dependencies": {
-    "@syncfusion/ej2-base": "~16.2.50",
-    "@syncfusion/ej2-data": "~16.2.50",
-    "@syncfusion/ej2-navigations": "~16.2.50",
-    "@syncfusion/ej2-inputs": "~16.2.50",
-    "@syncfusion/ej2-popups": "~16.2.50",
-    "@syncfusion/ej2-buttons": "~16.2.50",
-    "@syncfusion/ej2-lists": "~16.2.50"
+    "@syncfusion/ej2-base": "~16.3.17",
+    "@syncfusion/ej2-data": "~16.3.17",
+    "@syncfusion/ej2-navigations": "~16.3.17",
+    "@syncfusion/ej2-inputs": "~16.3.17",
+    "@syncfusion/ej2-popups": "~16.3.17",
+    "@syncfusion/ej2-buttons": "~16.3.17",
+    "@syncfusion/ej2-lists": "~16.3.17"
   },
   "devDependencies": {
     "@types/chai": "^3.4.28",
@@ -44,10 +44,15 @@
   "keywords": [
     "ej2",
     "syncfusion",
-    "ej2-diagram",
-    "web-components",
+    "ej2-diagrams",
+    "datavisualization-components",
     "TypeScript",
-    "diagram"
+    "diagram",
+    "flowchart",
+    "organization-chart",
+    "mind-map",
+    "bpmn",
+    "org-chart"
   ],
   "repository": {
     "type": "git",

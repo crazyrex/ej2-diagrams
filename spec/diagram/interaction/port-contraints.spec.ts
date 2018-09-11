@@ -99,4 +99,58 @@ describe('Diagram Control', () => {
             done();
         })
     })
+
+    describe('Ports with constraints undo redo ', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+
+        let mouseEvents: MouseEvents = new MouseEvents();
+
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagram3' });
+            document.body.appendChild(ele);
+            let selArray: (NodeModel | ConnectorModel)[] = [];
+            let nodeport1: PointPortModel = {
+                offset: { x: 0.5, y: 0.5 }, visibility: PortVisibility.Visible
+            };
+            let nodeport2: PointPortModel = {
+                offset: { x: 0.5, y: 0.5 }, visibility: PortVisibility.Visible
+            };
+            let node: NodeModel = { id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100, ports: [nodeport1] };
+            let node1: NodeModel = { id: 'node2', width: 100, height: 100, offsetX: 400, offsetY: 100, ports: [nodeport2] };
+            diagram = new Diagram({
+
+                width: '500px', height: '500px', nodes: [node, node1]
+                //connectors: [connector]
+            });
+
+            diagram.appendTo('#diagram3');
+        });
+
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+
+        it('Checking selected port dragging undo redo ', (done: Function) => {
+            let mouseEvents: MouseEvents = new MouseEvents();
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.mouseMoveEvent(diagramCanvas, 68, 68, true);
+            let node: NodeModel = diagram.nodes[0];
+            node.ports[0].constraints = PortConstraints.Drag;
+            //    diagramCanvas = document.getElementById('node1_' + (diagram.nodes[0] as Node).ports[0].id);
+            //  let rect: ClientRect = diagramCanvas.getBoundingClientRect();
+            mouseEvents.clickEvent(diagramCanvas, 102.5, 102.5);
+            mouseEvents.dragAndDropEvent(diagramCanvas, 102.5, 102.5, 103, 103);
+            expect(diagram.nodes[0].ports[0].offset.x).toBe(0.51);
+            expect(diagram.nodes[0].ports[0].offset.y).toBe(0.51);
+            diagram.clearSelection();
+            diagram.undo();
+            diagram.redo();
+            done();
+        });
+
+
+
+    })
 });

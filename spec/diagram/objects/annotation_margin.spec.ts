@@ -39,7 +39,7 @@ describe('Diagram Control', () => {
             annotation = {
                 content: 'top left margin, top left alignment, offset 0', offset: { x: 0, y: 0 },
                 horizontalAlignment: 'Left', verticalAlignment: 'Top', margin: { left: 15, top: 10 },
-                style: style
+                style: style, width: 85
             };
 
             node.annotations = [annotation];

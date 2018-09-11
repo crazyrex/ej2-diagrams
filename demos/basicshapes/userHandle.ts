@@ -4,6 +4,7 @@ import {
     , ToolBase, MoveTool, MouseEventArgs, cloneObject, IElement, Rect, DiagramRenderer, Actions, randomId, SelectorConstraints
 } from '../../src/diagram/index';
 import { DiagramElement } from '../../src/diagram/index';
+import { MouseEvents } from '../../spec/diagram/interaction/mouseevents.spec';
 
 
 
@@ -83,10 +84,6 @@ let diagram: Diagram = new Diagram({
     getCustomTool: getTool, getCustomCursor: getCursor
 });
 
-
-
-
-
 document.getElementById('buttons').onclick = remove1;
 function remove1() {
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
@@ -98,7 +95,6 @@ document.getElementById('side').onchange = side;
 function side() {
     var e = (document.getElementById('side')) as HTMLSelectElement;
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
-
     var sel = e.selectedIndex;
     var opt: any = e.options[sel];
     var CurValue = (<HTMLSelectElement>opt).value;
@@ -119,8 +115,6 @@ document.getElementById('align').onchange = align;
 function align() {
     var e = (document.getElementById('align')) as HTMLSelectElement;
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
-
-
     var sel = e.selectedIndex;
     var opt: any = e.options[sel];
     var CurValue = (<HTMLSelectElement>opt).value;
@@ -128,22 +122,23 @@ function align() {
     diagram.dataBind();
 }
 
-document.getElementById('offsety').onchange = offy;
-function offy() {
-    var e = (document.getElementById('offsety')) as HTMLSelectElement;
+let offsety: HTMLButtonElement = document.getElementById('offsety') as HTMLButtonElement;
+offsety.onclick = () => {
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
-
-
-    var CurValue = e.value;
-    diagram.selectedItems.userHandles[index].offset = Number(CurValue);
+    diagram.selectedItems.userHandles[index].offset = 1;
     diagram.dataBind();
-}
+};
+let mleft: HTMLButtonElement = document.getElementById('mleft') as HTMLButtonElement;
+mleft.onclick = () => {
+    var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
+    diagram.selectedItems.userHandles[index].borderWidth = 9;
+    diagram.dataBind();
+};
 document.getElementById('mtop').onchange = mtop;
 function mtop() {
     var e = (document.getElementById('mtop')) as HTMLSelectElement;
     var CurValue = e.value;
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
-
     diagram.selectedItems.userHandles[index].backgroundColor = CurValue;
     diagram.dataBind();
 }
@@ -152,19 +147,10 @@ function mbottom() {
     var e = (document.getElementById('mbottom')) as HTMLSelectElement;
     var CurValue = e.value;
     var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
-
     diagram.selectedItems.userHandles[index].borderColor = CurValue;
     diagram.dataBind();
 }
-document.getElementById('mleft').onchange = mleft;
-function mleft() {
-    var e = (document.getElementById('mleft')) as HTMLSelectElement;
-    var CurValue = e.value;
-    var index = Number(((document.getElementById('handle')) as HTMLSelectElement).value);
 
-    diagram.selectedItems.userHandles[index].borderWidth = Number(CurValue);
-    diagram.dataBind();
-}
 document.getElementById('mright').onchange = mright;
 function mright() {
     var e = (document.getElementById('mright')) as HTMLSelectElement;
@@ -175,6 +161,7 @@ function mright() {
     diagram.dataBind();
 }
 diagram.appendTo('#diagram');
+diagram.select([diagram.nodes[3]]);
 
 function getTool(action: string): ToolBase {
     let tool: ToolBase
@@ -185,12 +172,19 @@ function getTool(action: string): ToolBase {
     return tool;
 }
 
+let scrollNode: HTMLButtonElement = document.getElementById('UserHandleSideChange-node') as HTMLButtonElement;
+scrollNode.onclick = () => {
+    let mouseevents: MouseEvents = new MouseEvents();
+    let diagramCanvas: Element = document.getElementById('diagramcontent');
+    diagram.selectedItems.userHandles[0].side = 'Right';
+    diagram.selectedItems.userHandles[1].side = 'Bottom';
+};
 function getCursor(action: string, active: boolean): string {
     let cursor: string;
     if (active && action === 'Drag') {
         cursor = '-webkit-grabbing';
     } else if (action === 'Drag') {
-        cursor = '-webkit-grab'
+        cursor = '-webkit-grab';
     }
     return cursor;
 }

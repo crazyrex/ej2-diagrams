@@ -1,26 +1,26 @@
 import { IElement, ISelectionChangeEventArgs, IConnectionChangeEventArgs, IDragOverEventArgs } from '../objects/interface/IElement';
 import { IDropEventArgs } from '../objects/interface/IElement';
 import { Connector, getBezierPoints, isEmptyVector, BezierSegment } from '../objects/connector';
-import { Node, BpmnShape, BpmnSubEvent } from '../objects/node';
+import { Node, BpmnShape, BpmnSubEvent, BpmnAnnotation } from '../objects/node';
 import { PathElement } from '../core/elements/path-element';
 import { TextElement } from '../core/elements/text-element';
 import { PointModel } from '../primitives/point-model';
 import { MouseEventArgs } from './event-handlers';
 import { PointPortModel } from '../objects/port-model';
 import { ConnectorModel, StraightSegmentModel, OrthogonalSegmentModel, BezierSegmentModel } from '../objects/connector-model';
-import { NodeModel, BpmnTransactionSubProcessModel } from '../objects/node-model';
+import { NodeModel, BpmnTransactionSubProcessModel, BpmnAnnotationModel } from '../objects/node-model';
 import { OrthogonalSegment } from '../objects/connector';
 import { Rect } from '../primitives/rect';
 import { Diagram } from '../../diagram/diagram';
-import { DiagramElement } from './../core/elements/diagram-element';
+import { DiagramElement, Corners } from './../core/elements/diagram-element';
 import { identityMatrix, rotateMatrix, transformPointByMatrix, scaleMatrix, Matrix } from './../primitives/matrix';
 import { cloneObject as clone, cloneObject, getBounds, rotatePoint } from './../utility/base-util';
-import { completeRegion, getTooltipOffset, sort, findPortIndex } from './../utility/diagram-util';
-import { randomId } from './../utility/base-util';
+import { completeRegion, getTooltipOffset, sort, findObjectIndex, intersect3, getAnnotationPosition } from './../utility/diagram-util';
+import { randomId, cornersPointsBeforeRotation } from './../utility/base-util';
 import { SelectorModel } from './selector-model';
 import { Selector } from './selector';
 import { hasSelection, isSelected, hasSingleConnection } from './actions';
-import { AlignmentOptions, DistributeOptions, SizingOptions, DiagramEvent, BoundaryConstraints } from '../enum/enum';
+import { AlignmentOptions, DistributeOptions, SizingOptions, DiagramEvent, BoundaryConstraints, AlignmentMode } from '../enum/enum';
 import { HistoryEntry } from '../diagram/history';
 import { canSelect, canMove, canRotate, canDragSourceEnd, canDragTargetEnd, canSingleSelect, canDrag } from './../utility/constraints-util';
 import { canMultiSelect, canContinuousDraw } from './../utility/constraints-util';
@@ -38,11 +38,16 @@ import { LayerModel } from '../diagram/layer-model';
 import { Layer } from '../diagram/layer';
 import { SelectorConstraints, Direction } from '../enum/enum';
 import { PageSettings } from '../diagram/page-settings';
-import { DiagramScroller } from '../interaction/scroller';
+import { DiagramScroller, Segment } from '../interaction/scroller';
 import { remove } from '@syncfusion/ej2-base';
 import { ConnectTool } from './tool';
-import { getOppositeDirection, getPortDirection } from './../utility/connector';
+import { getOppositeDirection, getPortDirection, findAngle, Intersection } from './../utility/connector';
 import { ILayout } from '../layout/layout-base';
+import { swapBounds, findPoint, orthoConnection2Segment, End, getIntersection } from './../utility/connector';
+import { ShapeAnnotationModel, PathAnnotationModel } from '../objects/annotation-model';
+import { ShapeAnnotation, PathAnnotation } from '../objects/annotation';
+import { SegmentInfo } from '../rendering/canvas-interface';
+import { PointPort } from '../objects/port';
 
 /**
  * Defines the behavior of commands
@@ -264,7 +269,9 @@ export class CommandHandler {
     /**
      * @private
      */
-    public findTarget(element: DiagramElement, argsTarget: IElement, source?: boolean): NodeModel | PointPortModel {
+    public findTarget(
+        element: DiagramElement, argsTarget: IElement,
+        source?: boolean, connection?: boolean): NodeModel | PointPortModel | ShapeAnnotationModel | PathAnnotationModel {
         let target: NodeModel | PointPortModel;
         if (argsTarget instanceof Node) {
             if (element && element.id === argsTarget.id + '_content') {
@@ -298,6 +305,15 @@ export class CommandHandler {
                 }
             }
         }
+        if (!connection && element instanceof TextElement) {
+            let annotation: ShapeAnnotationModel | PathAnnotationModel;
+            for (let i: number = 0; i < (argsTarget as NodeModel | ConnectorModel).annotations.length; i++) {
+                annotation = (argsTarget as NodeModel | ConnectorModel).annotations[i];
+                if (element.id === (argsTarget as NodeModel | ConnectorModel).id + '_' + annotation.id) {
+                    return annotation;
+                }
+            }
+        }
         return argsTarget;
     }
 
@@ -312,14 +328,58 @@ export class CommandHandler {
         } else if (args.source instanceof Connector && this.diagram.currentDrawingObject) {
             connect = this.diagram.currentDrawingObject as Connector;
         }
-        let targetObject: NodeModel | PointPortModel =
-            this.findTarget(args.targetWrapper, args.target, endPoint === 'ConnectorSourceEnd');
+        let targetObject: NodeModel | PointPortModel = this.findTarget(
+            args.targetWrapper, args.target, endPoint === 'ConnectorSourceEnd', true) as (NodeModel | PointPortModel);
         let nodeEnd: string = endPoint === 'ConnectorSourceEnd' ? 'sourceID' : 'targetID';
         let portEnd: string = endPoint === 'ConnectorSourceEnd' ? 'sourcePortID' : 'targetPortID';
         if (connect[nodeEnd] !== targetNodeId || connect[portEnd] !== targetPortId) {
             return true;
         }
         return false;
+    }
+
+    /**
+     * @private
+     */
+    public changeAnnotationDrag(args: MouseEventArgs): void {
+        let selectorModel: SelectorModel; let connector: Connector;
+        if (args.source && (args.source as SelectorModel).connectors &&
+            (args.source as SelectorModel).connectors.length && this.diagram.bpmnModule &&
+            this.diagram.bpmnModule.textAnnotationConnectors.indexOf(
+                ((args.source as SelectorModel).connectors[0] as Connector)) > -1) {
+            if (args.source instanceof Selector) {
+                selectorModel = args.source as SelectorModel;
+                connector = selectorModel.connectors[0] as Connector;
+            }
+            let id: string[] = connector.id.split('_');
+            let annotationId: string = id[id.length - 1];
+            let nodeId: string = id[id.length - 3] || id[0];
+            if (args.target && (args.target as Node).id !== nodeId &&
+                ((args.target as Node).shape as BpmnShape).shape !== 'TextAnnotation') {
+                this.diagram.startGroupAction();
+                let parentNode: Node = this.diagram.nameTable[id[0]];
+                let clonedNode: Node = this.getAnnotation(parentNode, id[1]) as Node;
+                let annotationNode: Object = {
+                    id: id[1] + randomId(),
+                    angle: Point.findAngle(connector.intermediatePoints[0], connector.intermediatePoints[1]),
+                    text: (clonedNode as BpmnAnnotationModel).text,
+                    length: Point.distancePoints(connector.intermediatePoints[0], connector.intermediatePoints[1]),
+                    shape: { shape: 'TextAnnotation', type: 'Bpmn' },
+                    nodeId: (clonedNode as BpmnAnnotationModel as BpmnAnnotation).nodeId
+                };
+                let annotationObj: BpmnAnnotationModel = new BpmnAnnotation(
+                    (args.target as Node).shape, 'annotations', annotationNode, true);
+                this.diagram.bpmnModule.checkAndRemoveAnnotations(this.diagram.nameTable[connector.targetID], this.diagram);
+                this.diagram.refreshCanvasLayers();
+                annotationObj.id = id[1];
+                this.diagram.addTextAnnotation(annotationObj, args.target);
+                this.diagram.endGroupAction();
+            } else if (connector) {
+                connector.sourceID = nodeId;
+                this.diagram.connectorPropertyChange(connector, {} as Connector, { sourceID: nodeId } as Connector);
+                this.diagram.updateDiagramObject(connector);
+            }
+        }
     }
 
     /**
@@ -338,7 +398,7 @@ export class CommandHandler {
             connector = this.diagram.currentDrawingObject as Connector;
         }
         let target: NodeModel | PointPortModel = this.findTarget(
-            args.targetWrapper, args.target, endPoint === 'ConnectorSourceEnd');
+            args.targetWrapper, args.target, endPoint === 'ConnectorSourceEnd', true) as (NodeModel | PointPortModel);
         let nodeEndId: string = endPoint === 'ConnectorSourceEnd' ? 'sourceID' : 'targetID';
         let portEndId: string = endPoint === 'ConnectorSourceEnd' ? 'sourcePortID' : 'targetPortID';
         if (target instanceof Node) {
@@ -503,7 +563,13 @@ export class CommandHandler {
         if (this.diagram.selectedItems.connectors.length > 0) {
             selectedItems = this.diagram.selectedItems.connectors;
             for (let j: number = 0; j < selectedItems.length; j++) {
-                let element: Object = clone((selectedItems[j]));
+                let element: Object;
+                if (this.diagram.bpmnModule &&
+                    this.diagram.bpmnModule.textAnnotationConnectors.indexOf(selectedItems[j] as Connector) > -1) {
+                    element = cloneObject((this.diagram.nameTable[(selectedItems[j] as Connector).targetID]));
+                } else {
+                    element = cloneObject((selectedItems[j]));
+                }
                 obj.push(element);
             }
         }
@@ -535,15 +601,18 @@ export class CommandHandler {
                     }
                     this.clipboardData.childTable = childTable;
                 }
-
-
             }
         }
         if (this.clipboardData.pasteIndex === 0) {
             this.startGroupAction();
             for (let item of selectedItems) {
                 if (this.diagram.nameTable[item.id]) {
-                    this.diagram.remove(item);
+                    if (this.diagram.bpmnModule &&
+                        this.diagram.bpmnModule.textAnnotationConnectors.indexOf((item as Connector)) > -1) {
+                        this.diagram.remove(this.diagram.nameTable[(item as Connector).targetID]);
+                    } else {
+                        this.diagram.remove(item);
+                    }
                 }
             }
             this.endGroupAction();
@@ -688,8 +757,8 @@ export class CommandHandler {
                                         let newConnector: ConnectorModel = this.diagram.nameTable[keyTable[edge]];
                                         newConnector.targetID = keyTable[copy.id];
                                         this.diagram.connectorPropertyChange(
-                                            newConnector as Connector, { targetID: '' } as Connector,
-                                            { targetID: newConnector.targetID } as Connector);
+                                            newConnector as Connector, { targetID: '', targetPortID: '' } as Connector,
+                                            { targetID: newConnector.targetID, targetPortID: newConnector.targetPortID } as Connector);
                                     }
                                 }
                             }
@@ -700,8 +769,8 @@ export class CommandHandler {
                                         let newConnector: ConnectorModel = this.diagram.nameTable[keyTable[edge]];
                                         newConnector.sourceID = keyTable[copy.id];
                                         this.diagram.connectorPropertyChange(
-                                            newConnector as Connector, { sourceID: '' } as Connector,
-                                            { sourceID: newConnector.sourceID } as Connector);
+                                            newConnector as Connector, { sourceID: '', sourcePortID: '' } as Connector,
+                                            { sourceID: newConnector.sourceID, sourcePortID: newConnector.sourcePortID } as Connector);
                                     }
                                 }
                             }
@@ -753,10 +822,31 @@ export class CommandHandler {
             && (node.shape as BpmnShape).activity.subProcess.processes.length) {
             process = ((cloneObject as Node).shape as BpmnShape).activity.subProcess.processes;
             (cloneObject as Node).zIndex = -1;
-            ((cloneObject as Node).shape as BpmnShape).activity.subProcess.processes = [];
+            ((cloneObject as Node).shape as BpmnShape).activity.subProcess.processes = undefined;
         }
         if (node.children && node.children.length && (!children || !children.length)) {
             newNode = this.cloneGroup(node, multiSelect);
+        } else if (node.shape && (node.shape as BpmnShape).shape === 'TextAnnotation' && node.id.indexOf('_textannotation_') !== -1 &&
+            this.diagram.nameTable[node.id]) {
+            let checkAnnotation: string[] = node.id.split('_textannotation_');
+            let parentNode: Node;
+            let annotation: Node = this.diagram.nameTable[node.id];
+            for (let j: number = 0; j < annotation.inEdges.length; j++) {
+                let connector: Connector = this.diagram.nameTable[annotation.inEdges[j]];
+                if (connector) {
+                    parentNode = this.diagram.nameTable[connector.sourceID];
+                    let clonedNode: Node = this.getAnnotation(parentNode, checkAnnotation[1]) as Node;
+                    let annotationNode: Object = {
+                        id: checkAnnotation[1] + randomId(),
+                        angle: (clonedNode as BpmnAnnotationModel).angle,
+                        text: (clonedNode as BpmnAnnotationModel).text,
+                        length: (clonedNode as BpmnAnnotationModel).length,
+                        shape: { shape: 'TextAnnotation', type: 'Bpmn' },
+                        nodeId: (clonedNode as BpmnAnnotationModel as BpmnAnnotation).nodeId
+                    };
+                    this.diagram.addTextAnnotation(annotationNode, parentNode);
+                }
+            }
         } else {
             this.translateObject(cloneObject as Node);
             (cloneObject as Node).zIndex = -1;
@@ -774,6 +864,18 @@ export class CommandHandler {
             this.selectObjects([newNode], multiSelect);
         }
         return newNode;
+    }
+
+    private getAnnotation(parent: Node, annotationId: string): BpmnAnnotationModel {
+        let currentAnnotation: BpmnAnnotationModel[] = (parent.shape as BpmnShape).annotations;
+        if (currentAnnotation && currentAnnotation.length) {
+            for (let g: number = 0; g <= currentAnnotation.length; g++) {
+                if (currentAnnotation[g].id === annotationId) {
+                    return currentAnnotation[g];
+                }
+            }
+        }
+        return undefined;
     }
 
     private cloneSubProcesses(node: NodeModel): void {
@@ -1100,6 +1202,20 @@ export class CommandHandler {
         }
     }
     /** @private */
+    public labelSelect(obj: NodeModel | ConnectorModel, textWrapper: DiagramElement): void {
+        let selectorModel: Selector = (this.diagram.selectedItems) as Selector;
+        selectorModel.nodes = selectorModel.connectors = [];
+        if (obj instanceof Node) {
+            selectorModel.nodes[0] = obj as NodeModel;
+        } else {
+            selectorModel.connectors[0] = obj as ConnectorModel;
+        }
+        selectorModel.annotation = (this.findTarget(textWrapper, obj as IElement)) as PathAnnotationModel | ShapeAnnotationModel;
+        selectorModel.init(this.diagram);
+        this.diagram.renderSelector(false);
+    }
+
+    /** @private */
     public unSelect(obj: NodeModel | ConnectorModel): void {
         let objArray: (NodeModel | ConnectorModel)[] = [];
         objArray.push(obj);
@@ -1151,8 +1267,8 @@ export class CommandHandler {
         return children;
     }
     private moveSvgNode(nodeId: string, targetID: string): void {
-        let diagramDiv: HTMLElement = getDiagramElement(targetID + '_groupElement');
-        let backNode: HTMLElement = getDiagramElement(nodeId + '_groupElement');
+        let diagramDiv: HTMLElement = getDiagramElement(targetID + '_groupElement', this.diagram.element.id);
+        let backNode: HTMLElement = getDiagramElement(nodeId + '_groupElement', this.diagram.element.id);
         diagramDiv.parentNode.insertBefore(backNode, diagramDiv);
     }
     /** @private */
@@ -1237,6 +1353,7 @@ export class CommandHandler {
                     target = zIndexTable[++i];
                 }
                 this.moveSvgNode(objectId, target);
+                this.updateNativeNodeIndex(objectId);
             } else {
                 this.diagram.refreshCanvasLayers();
             }
@@ -1275,8 +1392,18 @@ export class CommandHandler {
                 let diagramLayer: SVGGElement = this.diagram.diagramLayer as SVGGElement;
                 let child: string[] = this.getChildElements(this.diagram.nameTable[objectName].wrapper.children);
                 let targerNodes: Object = [];
-                let element: HTMLElement = getDiagramElement(objectName + '_groupElement');
+                let element: HTMLElement = getDiagramElement(objectName + '_groupElement', this.diagram.element.id);
                 element.parentNode.removeChild(element);
+                let nodes: NodeModel[] = this.diagram.selectedItems.nodes;
+                if (nodes.length > 0 && (nodes[0].shape.type === 'Native' || nodes[0].shape.type === 'HTML')) {
+                    for (let j: number = 0; j < this.diagram.views.length; j++) {
+                        element = getDiagramElement(
+                            objectName + (nodes[0].shape.type === 'HTML' ? '_content_html_element' : '_content_groupElement'),
+                            this.diagram.views[j]);
+                        let lastChildNode: HTMLElement = element.parentNode.lastChild as HTMLElement;
+                        lastChildNode.parentNode.insertBefore(element, lastChildNode.nextSibling);
+                    }
+                }
                 let htmlLayer: HTMLElement = getHTMLLayer(this.diagram.element.id);
                 this.diagram.diagramRenderer.renderElement(this.diagram.nameTable[objectName].wrapper, diagramLayer, htmlLayer);
             } else {
@@ -1330,6 +1457,7 @@ export class CommandHandler {
                 this.diagram.nameTable[zIndexTable[currentObject]].zIndex = currentObject;
                 if (this.diagram.mode === 'SVG') {
                     this.moveSvgNode(zIndexTable[Number(intersectArray[0].zIndex)], nodeId);
+                    this.updateNativeNodeIndex(zIndexTable[Number(intersectArray[0].zIndex)], nodeId);
                 } else {
                     this.diagram.refreshCanvasLayers();
                 }
@@ -1370,6 +1498,7 @@ export class CommandHandler {
                 this.diagram.nameTable[zIndexTable[currentObject]].zIndex = currentObject;
                 if (this.diagram.mode === 'SVG') {
                     this.moveSvgNode(objectId, zIndexTable[intersectArray[intersectArray.length - 1].zIndex]);
+                    this.updateNativeNodeIndex(objectId, zIndexTable[intersectArray[intersectArray.length - 1].zIndex]);
                 } else {
                     this.diagram.refreshCanvasLayers();
                 }
@@ -1377,6 +1506,20 @@ export class CommandHandler {
         }
     }
 
+    public updateNativeNodeIndex(nodeId: string, targetID?: string): void {
+        let nodes: NodeModel[] = this.diagram.selectedItems.nodes;
+        for (let i: number = 0; i < this.diagram.views.length; i++) {
+            if (nodes.length > 0
+                && (nodes[0].shape.type === 'HTML'
+                    || nodes[0].shape.type === 'Native')) {
+                let id: string = nodes[0].shape.type === 'HTML' ? '_content_html_element' : '_content_groupElement';
+                let backNode: HTMLElement = getDiagramElement(nodeId + id, this.diagram.views[i]);
+                let diagramDiv: HTMLElement = targetID ? getDiagramElement(targetID + id, this.diagram.views[i])
+                    : backNode.parentElement.firstChild as HTMLElement;
+                diagramDiv.parentNode.insertBefore(backNode, diagramDiv);
+            }
+        }
+    }
 
     public initSelectorWrapper(): void {
         let selectorModel: SelectorModel = this.diagram.selectedItems;
@@ -1473,6 +1616,7 @@ export class CommandHandler {
                 selectormodel.nodes = [];
                 selectormodel.connectors = [];
                 selectormodel.wrapper = null;
+                (selectormodel as Selector).annotation = undefined;
                 this.diagram.clearSelectorLayer();
                 if (triggerAction) {
                     arg = {
@@ -1520,6 +1664,68 @@ export class CommandHandler {
                     this.dragControlPoint(connector, tx, ty, true);
                     let conn: Connector = { sourcePoint: connector.sourcePoint, targetPoint: connector.targetPoint } as Connector;
                     this.diagram.connectorPropertyChange(connector as Connector, {} as Connector, conn);
+                }
+            }
+        }
+    }
+
+    public connectorSegmentChange(actualObject: Node, existingInnerBounds: Rect, isRotate: boolean): void {
+        let tx: number; let ty: number; let segmentChange: boolean = true;
+        if (existingInnerBounds.equals(existingInnerBounds, actualObject.wrapper.bounds) === false) {
+            if (actualObject.outEdges.length > 0) {
+                for (let k: number = 0; k < actualObject.outEdges.length; k++) {
+                    let connector: Connector = this.diagram.nameTable[actualObject.outEdges[k]];
+                    if (connector.targetID !== '') {
+                        segmentChange = this.isSelected(this.diagram.nameTable[connector.targetID]) ? false : true;
+                    } else {
+                        segmentChange = this.isSelected(this.diagram.nameTable[connector.id]) ? false : true;
+                    }
+                    if (connector.type === 'Orthogonal' && connector.segments && connector.segments.length > 1) {
+                        if (!isRotate) {
+                            if (segmentChange) {
+                                switch ((connector.segments[0] as OrthogonalSegment).direction) {
+                                    case 'Bottom':
+                                        tx = actualObject.wrapper.bounds.bottomCenter.x - existingInnerBounds.bottomCenter.x;
+                                        ty = actualObject.wrapper.bounds.bottomCenter.y - existingInnerBounds.bottomCenter.y;
+                                        break;
+                                    case 'Top':
+                                        tx = actualObject.wrapper.bounds.topCenter.x - existingInnerBounds.topCenter.x;
+                                        ty = actualObject.wrapper.bounds.topCenter.y - existingInnerBounds.topCenter.y;
+                                        break;
+                                    case 'Left':
+                                        tx = actualObject.wrapper.bounds.middleLeft.x - existingInnerBounds.middleLeft.x;
+                                        ty = actualObject.wrapper.bounds.middleLeft.y - existingInnerBounds.middleLeft.y;
+                                        break;
+                                    case 'Right':
+                                        tx = actualObject.wrapper.bounds.middleRight.x - existingInnerBounds.middleRight.x;
+                                        ty = actualObject.wrapper.bounds.middleRight.y - existingInnerBounds.middleRight.y;
+                                        break;
+                                }
+                                this.dragSourceEnd(
+                                    connector, tx, ty, true, null, 'ConnectorSourceEnd', undefined, undefined, undefined, true);
+                            }
+                        } else {
+                            let firstSegment: OrthogonalSegment = connector.segments[0] as OrthogonalSegment;
+                            let secondSegment: OrthogonalSegment = connector.segments[1] as OrthogonalSegment;
+                            let cornerPoints: Corners = swapBounds(
+                                actualObject.wrapper, actualObject.wrapper.corners, actualObject.wrapper.bounds);
+                            let sourcePoint: PointModel = findPoint(cornerPoints, firstSegment.direction);
+                            sourcePoint = getIntersection(
+                                connector, connector.sourceWrapper, sourcePoint,
+                                { x: connector.sourceWrapper.offsetX, y: connector.sourceWrapper.offsetY }, false);
+                            let source: End = {
+                                corners: undefined, point: sourcePoint, margin: undefined, direction: firstSegment.direction
+                            };
+                            let target: End = {
+                                corners: undefined, point: secondSegment.points[1], margin: undefined, direction: undefined
+                            };
+                            let intermediatePoints: PointModel[] = orthoConnection2Segment(source, target);
+                            firstSegment.length = Point.distancePoints(intermediatePoints[0], intermediatePoints[1]);
+                            if (secondSegment.direction && secondSegment.length) {
+                                secondSegment.length = Point.distancePoints(intermediatePoints[1], intermediatePoints[2]);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1661,14 +1867,14 @@ export class CommandHandler {
                 }
             }
         } else {
-            if (target && targetPortId && connector.sourcePortID !== targetPortId &&
-                connector.segments && (connector.segments[0] as OrthogonalSegment).direction !== null && target && target instanceof Node) {
-                this.changeSourceEndToPort(connector, target, targetPortId);
-            } else if (target && (connector.sourceID !== target.id || connector.sourcePortID === '') &&
+            if (target && !targetPortId && connector.sourceID !== target.id &&
                 connector.segments && (connector.segments[0] as OrthogonalSegment).direction !== null && target && target instanceof Node) {
                 this.changeSourceEndToNode(connector, target);
             }
-
+            if (target && targetPortId && connector.sourcePortID !== targetPortId &&
+                connector.segments && (connector.segments[0] as OrthogonalSegment).direction !== null && target && target instanceof Node) {
+                this.changeSourceEndToPort(connector, target, targetPortId);
+            }
         }
     }
 
@@ -1678,7 +1884,7 @@ export class CommandHandler {
     private changeSourceEndToPort(connector: ConnectorModel, target: Node, targetPortId: string): void {
         let port: DiagramElement = this.diagram.getWrapper(target.wrapper, targetPortId);
         let point: PointModel = { x: port.offsetX, y: port.offsetY };
-        let direction: Direction = getPortDirection(point, target.wrapper.corners, target.wrapper.bounds, false);
+        let direction: Direction = getPortDirection(point, cornersPointsBeforeRotation(target.wrapper), target.wrapper.bounds, false);
         let firstSegment: OrthogonalSegment = connector.segments[0] as OrthogonalSegment;
         let secondSegment: OrthogonalSegment = connector.segments[1] as OrthogonalSegment;
         if (firstSegment.direction !== direction) {
@@ -1767,7 +1973,7 @@ export class CommandHandler {
      */
     private changeSourceEndToNode(connector: ConnectorModel, target: Node): void {
         this.removeTerminalSegment(connector as Connector);
-        let sourceWrapper: Rect = target.wrapper.children[0].corners; let sourcePoint: PointModel; let sourcePoint2: PointModel;
+        let sourceWrapper: Corners = target.wrapper.children[0].corners; let sourcePoint: PointModel; let sourcePoint2: PointModel;
         let firstSegment: OrthogonalSegment = connector.segments[0] as OrthogonalSegment;
         let nextSegment: OrthogonalSegment = connector.segments[1] as OrthogonalSegment;
         let segments: OrthogonalSegmentModel[] = [];
@@ -2046,13 +2252,15 @@ export class CommandHandler {
         let temp: NodeModel = node;
         for (let i: number = 0; i < temp.children.length; i++) {
             node = (this.diagram.nameTable[temp.children[i]]);
-            if (!node.children) {
-                nodes.push(node);
-            } else {
-                if (includeParent) {
+            if (node) {
+                if (!node.children) {
                     nodes.push(node);
+                } else {
+                    if (includeParent) {
+                        nodes.push(node);
+                    }
+                    nodes = this.getAllDescendants(node, nodes);
                 }
-                nodes = this.getAllDescendants(node, nodes);
             }
         }
         return nodes;
@@ -2184,22 +2392,256 @@ export class CommandHandler {
         let oldValues: Object; let changedvalues: Object;
         let port: PointPortModel = this.findTarget(portElement, obj as IElement) as PointPortModel;
         let bounds: Rect = getBounds(obj.wrapper);
-        let index: string = findPortIndex(obj as NodeModel, port.id);
-        let ports: Object = {};
-        ports[index] = { offset: { x: (port as PointPortModel).offset.x, y: (port as PointPortModel).offset.y } };
         if (port && canDrag(port, this.diagram)) {
-            oldValues = { ports: ports };
+            oldValues = this.getPortChanges(obj, port as PointPort);
             port.offset.x += (tx / bounds.width);
             port.offset.y += (ty / bounds.height);
-            ports = {};
-            ports[index] = { offset: { x: (port as PointPortModel).offset.x, y: (port as PointPortModel).offset.y } };
-            changedvalues = { ports: ports };
+            changedvalues = this.getPortChanges(obj, port as PointPort);
             this.diagram.nodePropertyChange(obj as Node, oldValues as Node, changedvalues as Node);
             this.diagram.updateDiagramObject(obj);
         }
     }
 
+    /** @private */
+    public labelDrag(
+        obj: NodeModel | ConnectorModel, textElement: DiagramElement, tx: number, ty: number): void {
+        let oldValues: Object; let changedvalues: Object;
+        let label: ShapeAnnotationModel | PathAnnotationModel;
+        label = this.findTarget(textElement, obj as IElement) as ShapeAnnotationModel | PathAnnotationModel;
+        let bounds: Rect = cornersPointsBeforeRotation(obj.wrapper);
+        oldValues = this.getAnnotationChanges(obj, label as ShapeAnnotation | PathAnnotation);
+        if (label instanceof ShapeAnnotation) {
+            label.offset.x += (tx / bounds.width);
+            label.offset.y += (ty / bounds.height);
+        } else {
+            this.updatePathAnnotationOffset(obj as Connector, label as PathAnnotation, tx, ty);
+            if (label instanceof PathAnnotation) { label.alignment = 'Center'; }
+        }
+        changedvalues = this.getAnnotationChanges(obj, label as ShapeAnnotation | PathAnnotation);
+        if (obj instanceof Node) {
+            this.diagram.nodePropertyChange(obj as Node, oldValues as Node, changedvalues as Node);
+        } else {
+            this.diagram.connectorPropertyChange(obj as Connector, oldValues as Connector, changedvalues as Connector);
+        }
+        this.diagram.updateDiagramObject(obj);
+        if (!isSelected(this.diagram, label, false, textElement)) {
+            this.labelSelect(obj, textElement);
+        }
+    }
 
+    private updatePathAnnotationOffset(
+        object: Connector, label: PathAnnotation, tx: number, ty: number, newPosition?: PointModel, size?: Size): void {
+        let textWrapper: DiagramElement = this.diagram.getWrapper(object.wrapper, label.id);
+        let offsetX: number = textWrapper.offsetX;
+        let offsetY: number = textWrapper.offsetY; let offset: PointModel;
+        let intermediatePoints: PointModel[] = object.intermediatePoints;
+        let prev: PointModel; let pointLength: number = 0; let totalLength: number = 0;
+        let intersectingOffset: PointModel;
+        let currentPosition: PointModel = (newPosition) ? newPosition : { x: offsetX + tx, y: offsetY + ty };
+        let intersetingPts: PointModel[] = this.getInterceptWithSegment(currentPosition, intermediatePoints);
+        let newOffset: PointModel = intermediatePoints[intermediatePoints.length - 1];
+        totalLength = Point.getLengthFromListOfPoints(intermediatePoints);
+        if (intersetingPts.length > 0) {
+            intersectingOffset = intersetingPts[intersetingPts.length - 1];
+            newOffset = intersectingOffset;
+            if (newOffset) {
+                let p: number; let bounds: Rect;
+                for (p = 0; p < intermediatePoints.length; p++) {
+                    if (prev != null) {
+                        bounds = Rect.toBounds([prev, intermediatePoints[p]]);
+                        if (bounds.containsPoint(newOffset)) {
+                            pointLength += Point.findLength(prev, newOffset);
+                            break;
+                        }
+                    }
+                    prev = intermediatePoints[p];
+                }
+                offset = { x: pointLength / totalLength, y: 0 };
+            }
+            this.updateLabelMargin(object, label, offset, currentPosition, size);
+        } else {
+            this.updateLabelMargin(object, label, null, currentPosition, size);
+        }
+    }
+
+
+    private updateLabelMargin(node: Connector, label: PathAnnotation, offset: PointModel, tempPt: PointModel, size?: Size): void {
+        offset = offset ? offset : { x: label.offset, y: 0 };
+        if (label && offset && offset.x > 0 && offset.x < 1) {
+            let point: PointModel;
+            let length: number = Point.getLengthFromListOfPoints(node.intermediatePoints);
+            point = this.getPointAtLength(length * offset.x, node.intermediatePoints, 0);
+            label.margin = { left: tempPt.x - point.x, top: tempPt.y - point.y, right: 0, bottom: 0 };
+            label.offset = offset.x;
+            if (size) {
+                label.width = size.width;
+                label.height = size.height;
+            }
+        }
+    }
+    private getPointAtLength(length: number, points: PointModel[], angle: number): PointModel {
+        angle = 0;
+        let run: number = 0; let pre: PointModel; let found: PointModel = { x: 0, y: 0 };
+        let pt: PointModel;
+        for (let i: number = 0; i < points.length; i++) {
+            pt = points[i];
+            if (!pre) {
+                pre = pt;
+                continue;
+            } else {
+                let l: number = Point.findLength(pre, pt);
+                let r: number; let deg: number; let x: number; let y: number;
+                if (run + l >= length) {
+                    r = length - run;
+                    deg = Point.findAngle(pre, pt);
+                    x = r * Math.cos(deg * Math.PI / 180);
+                    y = r * Math.sin(deg * Math.PI / 180);
+                    found = { x: pre.x + x, y: pre.y + y };
+                    angle = deg;
+                    break;
+                } else {
+                    run += l;
+                }
+            }
+            pre = pt;
+        }
+        return found;
+    }
+
+    private getInterceptWithSegment(currentPosition: PointModel, conPoints: PointModel[]): PointModel[] {
+        let intercepts: PointModel[] = []; let imgLine: PointModel[] = []; let segemnt: PointModel[] = [];
+        let tarAngle: number; let srcAngle: number; let maxLength: number;
+        maxLength = Point.findLength({ x: 0, y: 0 }, { x: this.diagram.scroller.viewPortWidth, y: this.diagram.scroller.viewPortHeight });
+        for (let i: number = 1; i < conPoints.length; i++) {
+            segemnt = [conPoints[i - 1], conPoints[i]];
+            imgLine = [];
+            srcAngle = Math.round(Point.findAngle(segemnt[0], segemnt[1]) % 360);
+            tarAngle = Math.round(Point.findAngle(segemnt[1], segemnt[0]) % 360);
+            let angleAdd: number = (srcAngle > 0 && srcAngle <= 90) || (srcAngle > 180 && srcAngle <= 270) ? 90 : -90;
+            imgLine.push(Point.transform(currentPosition, srcAngle + angleAdd, maxLength));
+            imgLine.push(Point.transform(currentPosition, tarAngle + angleAdd, maxLength));
+            let lineUtil1: Segment = { x1: segemnt[0].x, y1: segemnt[0].y, x2: segemnt[1].x, y2: segemnt[1].y };
+            let lineUtil2: Segment = { x1: imgLine[0].x, y1: imgLine[0].y, x2: imgLine[1].x, y2: imgLine[1].y };
+            let line3: Intersection = intersect3(lineUtil1, lineUtil2);
+            if (line3.enabled) {
+                intercepts.push(line3.intersectPt);
+            }
+        }
+        return intercepts;
+    }
+    /** @private */
+    public getAnnotationChanges(object: NodeModel | ConnectorModel, label: ShapeAnnotation | PathAnnotation): Object {
+        let index: string = findObjectIndex(object as NodeModel, label.id, true);
+        let annotations: Object = {};
+        annotations[index] = {
+            width: label.width, height: label.height, offset: (object instanceof Node) ? ({
+                x: (label as ShapeAnnotationModel).offset.x,
+                y: (label as ShapeAnnotationModel).offset.y
+            }) : (label as PathAnnotationModel).offset,
+            rotateAngle: label.rotateAngle,
+            margin: { left: label.margin.left, right: label.margin.right, top: label.margin.top, bottom: label.margin.bottom },
+            horizontalAlignment: label.horizontalAlignment, verticalAlignment: label.verticalAlignment,
+            alignment: ((object instanceof Connector) ? (label as PathAnnotation).alignment : undefined)
+        };
+        return { annotations: annotations };
+    }
+
+    /** @private */
+    public getPortChanges(object: NodeModel | ConnectorModel, port: PointPort): Object {
+        let index: string = findObjectIndex(object as NodeModel, port.id, false);
+        let ports: Object = {};
+        ports[index] = { offset: port.offset };
+        return { ports: ports };
+    }
+
+    /** @private */
+    public labelRotate(
+        object: NodeModel | ConnectorModel, label: ShapeAnnotation | PathAnnotation,
+        currentPosition: PointModel, selector: Selector): void {
+        let oldValues: Object; let changedvalues: Object;
+        oldValues = this.getAnnotationChanges(object, label);
+        let matrix: Matrix = identityMatrix();
+        let rotateAngle: number = (label as ShapeAnnotation).rotateAngle;
+        let labelWrapper: DiagramElement = this.diagram.getWrapper(object.wrapper, label.id);
+        let angle: number = findAngle({ x: labelWrapper.offsetX, y: labelWrapper.offsetY }, currentPosition) + 90;
+        let snapAngle: number = this.snapAngle(angle);
+        angle = snapAngle !== 0 ? snapAngle : angle;
+        if (label instanceof PathAnnotation && label.segmentAngle) {
+            let getPointloop: SegmentInfo = getAnnotationPosition(
+                (object as Connector).intermediatePoints, label as PathAnnotation, (object as Connector).wrapper.bounds);
+            angle -= getPointloop.angle;
+        }
+        angle = (angle + 360) % 360;
+        label.rotateAngle += angle - (label.rotateAngle + labelWrapper.parentTransform);
+        label.margin.bottom += (labelWrapper.verticalAlignment === 'Top') ? (-label.height / 2) : (
+            (labelWrapper.verticalAlignment === 'Bottom') ? (label.height / 2) : 0);
+        label.margin.right += (labelWrapper.horizontalAlignment === 'Left') ? (-label.width / 2) : (
+            (labelWrapper.horizontalAlignment === 'Right') ? (label.width / 2) : 0);
+        if (label instanceof PathAnnotation) {
+            label.alignment = 'Center';
+        } else {
+            label.horizontalAlignment = label.verticalAlignment = 'Center';
+        }
+        selector.wrapper.rotateAngle = selector.rotateAngle = label.rotateAngle;
+        changedvalues = this.getAnnotationChanges(object, label);
+        if (object instanceof Node) {
+            this.diagram.nodePropertyChange(object as Node, oldValues as Node, changedvalues as Node);
+        } else {
+            this.diagram.connectorPropertyChange(object as Connector, oldValues as Connector, changedvalues as Connector);
+        }
+        this.diagram.updateDiagramObject(object);
+    }
+    /** @private */
+    public labelResize(
+        node: NodeModel | ConnectorModel, label: ShapeAnnotation | PathAnnotationModel, deltaWidth: number, deltaHeight: number,
+        pivot: PointModel, selector: Selector): void {
+        let oldValues: Object; let changedvalues: Object; let rotateAngle: number;
+        oldValues = this.getAnnotationChanges(node, label as ShapeAnnotation | PathAnnotation);
+        let textElement: DiagramElement = selector.wrapper.children[0];
+        if ((deltaWidth && deltaWidth !== 1) || (deltaHeight && deltaHeight !== 1)) {
+            let newMat: Matrix = identityMatrix(); let matrix: Matrix = identityMatrix();
+            rotateMatrix(newMat, -(node as NodeModel).rotateAngle, (node as NodeModel).offsetX, (node as NodeModel).offsetY);
+            rotateAngle = ((textElement.rotateAngle + ((node instanceof Node) ? (node as NodeModel).rotateAngle : 0)) + 360) % 360;
+            rotateMatrix(matrix, -rotateAngle, pivot.x, pivot.y);
+            scaleMatrix(matrix, deltaWidth, deltaHeight, pivot.x, pivot.y);
+            rotateMatrix(matrix, rotateAngle, pivot.x, pivot.y);
+            let newPosition: PointModel = transformPointByMatrix(matrix, { x: textElement.offsetX, y: textElement.offsetY });
+            let height: number = textElement.actualSize.height * deltaHeight;
+            let width: number = textElement.actualSize.width * deltaWidth;
+            let shape: ShapeAnnotationModel | PathAnnotationModel = this.findTarget(textElement, node as IElement) as ShapeAnnotation;
+            if (shape instanceof PathAnnotation) {
+                this.updatePathAnnotationOffset(node as Connector, label as PathAnnotation, 0, 0, newPosition, new Size(width, height));
+            } else {
+                let bounds: Rect = cornersPointsBeforeRotation(node.wrapper);
+                newPosition = transformPointByMatrix(newMat, newPosition);
+                newPosition.x = newPosition.x - textElement.margin.left + textElement.margin.right;
+                newPosition.y = newPosition.y - textElement.margin.top + textElement.margin.bottom;
+
+                newPosition.y += (shape.verticalAlignment === 'Top') ? (-height / 2) : (
+                    (shape.verticalAlignment === 'Bottom') ? (height / 2) : 0);
+                newPosition.x += (shape.horizontalAlignment === 'Left') ? (-width / 2) : (
+                    (shape.horizontalAlignment === 'Right') ? (width / 2) : 0);
+                let offsetx: number = bounds.width / (newPosition.x - bounds.x);
+                let offsety: number = bounds.height / (newPosition.y - bounds.y);
+                if (width > 1) {
+                    shape.width = width;
+                    shape.offset.x = 1 / offsetx;
+                }
+                if (height > 1) {
+                    shape.height = height;
+                    shape.offset.y = 1 / offsety;
+                }
+            }
+        }
+        if (label instanceof PathAnnotation) { label.alignment = 'Center'; }
+        changedvalues = this.getAnnotationChanges(node, label as ShapeAnnotation | PathAnnotation);
+        if (node instanceof Node) {
+            this.diagram.nodePropertyChange(node as Node, oldValues as Node, changedvalues as Node);
+        } else {
+            this.diagram.connectorPropertyChange(node as Connector, oldValues as Connector, changedvalues as Connector);
+        }
+        this.diagram.updateDiagramObject(node);
+    }
 
     /** @private */
     public getSubProcess(source: IElement): SelectorModel {
@@ -2291,24 +2733,27 @@ export class CommandHandler {
      */
     public initExpand(args: MouseEventArgs): void {
         let node: Node = (args.target || args.source) as Node;
-        this.expandNode(node, false, this.diagram);
+        let oldValues: Node = { isExpanded: node.isExpanded } as Node;
+        node.isExpanded = !node.isExpanded;
+        this.diagram.nodePropertyChange(node, oldValues, { isExpanded: node.isExpanded } as Node);
     }
 
     /** @private */
-    public expandNode(node: Node, propChange?: boolean, diagram?: Diagram): ILayout {
+    public expandNode(node: Node, diagram?: Diagram): ILayout {
         let animation: boolean;
         let objects: ILayout;
-        let expand: boolean = propChange ? node.isExpanded : !node.isExpanded;
+        let expand: boolean = node.isExpanded;
         this.expandCollapse(node, expand, this.diagram);
         node.isExpanded = expand;
         this.diagram.layout.fixedNode = node.id;
-        if (!propChange) {
-            this.diagram.updateIcon(node);
-        }
         if (this.diagram.layoutAnimateModule && this.diagram.layout.enableAnimation) {
             this.diagram.organizationalChartModule.isAnimation = true;
         }
+        this.diagram.preventNodesUpdate = true;
+        this.diagram.preventConnectorsUpdate = true;
         objects = this.diagram.doLayout();
+        this.diagram.preventNodesUpdate = false;
+        this.diagram.preventConnectorsUpdate = false;
 
         if (this.diagram.layoutAnimateModule && this.diagram.layout.enableAnimation) {
             this.layoutAnimateModule.expand(this.diagram.organizationalChartModule.isAnimation, objects, node, this.diagram);
@@ -2328,11 +2773,14 @@ export class CommandHandler {
                 this.expandCollapse(target, visibility, diagram);
             }
             let oldValues: (NodeModel | ConnectorModel) = {
-                visible: target.visible
+                visible: target.visible,
+                style: { opacity: target.style.opacity }
             };
             target.visible = visibility;
+            target.style.opacity = (this.diagram.layout.enableAnimation && visibility) ? 0.1 : target.style.opacity;
             let newValues: (NodeModel | ConnectorModel) = {
-                visible: target.visible
+                visible: target.visible,
+                style: { opacity: target.style.opacity }
             };
             diagram.nodePropertyChange(target as Node, oldValues as Node, newValues as Node);
             diagram.connectorPropertyChange(connector as Connector, oldValues as Connector, newValues as Connector);
@@ -2354,6 +2802,17 @@ export class CommandHandler {
             if (this.diagram.mode !== 'SVG') {
                 this.diagram.refreshDiagramLayer();
             }
+        }
+    }
+    /**
+     * @private
+     */
+    public updateConnectorPoints(obj: Node | Connector, rect?: Rect): void {
+        if (obj instanceof Connector) {
+            this.diagram.connectorPropertyChange(obj as Connector, {} as Connector, {
+                targetPoint: obj.targetPoint
+            } as Connector);
+            this.diagram.updateDiagramObject(obj);
         }
     }
     /** @private */
@@ -2405,6 +2864,9 @@ export class CommandHandler {
     /** @private */
     public isDroppable(source: IElement, targetNodes: IElement): boolean {
         let node: Node = this.diagram.nameTable[(source as Node).id] || (source as SelectorModel).nodes[0];
+        if ((node.shape as BpmnShape).shape === 'TextAnnotation') {
+            return true;
+        }
         if (node && node.shape.type === 'Bpmn') {
             if ((node.processId === (targetNodes as Node).id) || (node.id === (targetNodes as Node).processId) ||
                 ((targetNodes as Node).shape as BpmnShape).activity.subProcess.collapsed) {
@@ -2421,7 +2883,7 @@ export class CommandHandler {
         if (args.target instanceof Node || (connectHighlighter && args.source instanceof Node)) {
             let tgt: IElement = connectHighlighter ? args.source : args.target;
             let tgtWrap: DiagramElement = connectHighlighter ? args.sourceWrapper : args.targetWrapper;
-            let target: NodeModel | PointPortModel = this.findTarget(tgtWrap, tgt, source);
+            let target: NodeModel | PointPortModel = this.findTarget(tgtWrap, tgt, source, true) as (NodeModel | PointPortModel);
             let element: DiagramElement;
             if (target instanceof BpmnSubEvent) {
                 let portId: string = target.id;
@@ -2473,6 +2935,22 @@ export class CommandHandler {
         }
     }
     /** @private */
+    public dropAnnotation(source: IElement, target: IElement): void {
+        let node: Node = (source instanceof Node) ? source : (source as Selector).nodes[0] as Node;
+        if (this.diagram.bpmnModule && (target as Node).shape.type === 'Bpmn'
+            && (node.shape as BpmnShape).shape === 'TextAnnotation') {
+            let hasTarget: string = 'hasTarget';
+            node[hasTarget] = (target as Node).id;
+            ((node.shape as BpmnShape).annotation as BpmnAnnotation).nodeId = (target as Node).id;
+            if (!this.diagram.currentSymbol) {
+                this.diagram.addTextAnnotation((node.shape as BpmnShape).annotation, target);
+                ((node.shape as BpmnShape).annotation as BpmnAnnotation).nodeId = '';
+                this.diagram.remove(node);
+            }
+            this.diagram.refreshDiagramLayer();
+        }
+    };
+    /** @private */
     public drop(source: IElement, target: IElement, position: PointModel): void {
         //drop
         if (this.diagram.bpmnModule) {
@@ -2487,62 +2965,30 @@ export class CommandHandler {
         this.diagram.addHistoryEntry(entry);
     }
     /** @private */
-    public align(objects: (NodeModel | ConnectorModel)[], option: AlignmentOptions): void {
+    public align(objects: (NodeModel | ConnectorModel)[], option: AlignmentOptions, type: AlignmentMode): void {
         if (objects.length > 0) {
             let i: number = 0;
-            let j: number = 0;
-            let bounds: Rect = getBounds(objects[0].wrapper);
+            let bounds: Rect = (type === 'Object') ? getBounds(objects[0].wrapper) : this.diagram.selectedItems.wrapper.bounds;
             let undoObj: SelectorModel = { nodes: [], connectors: [] };
             let redoObj: SelectorModel = { nodes: [], connectors: [] };
-            for (i = 1; i < objects.length; i++) {
+            for (i = ((type === 'Object') ? (i + 1) : i); i < objects.length; i++) {
                 let tx: number = 0;
                 let ty: number = 0;
-
+                let objectBounds: Rect = getBounds(objects[i].wrapper);
                 if (option === 'Left') {
-                    if (objects[i] instanceof Node) {
-                        tx = bounds.topLeft.x +
-                            (objects[i] as Node).width / 2 - (objects[i] as Node).offsetX;
-                    } else {
-                        tx = bounds.topLeft.x - (objects[i] as Connector).sourcePoint.x;
-                    }
+                    tx = bounds.left + objectBounds.width / 2 - objectBounds.center.x;
                 } else if (option === 'Right') {
-                    if (objects[i] instanceof Node) {
-                        tx = bounds.topRight.x -
-                            (objects[i] as Node).width / 2 - (objects[i] as Node).offsetX;
-                    } else {
-                        tx = bounds.topRight.x - (objects[i] as Connector).wrapper.bounds.width -
-                            (objects[i] as Connector).sourcePoint.x;
-                    }
+                    tx = bounds.right - objectBounds.width / 2 - objectBounds.center.x;
                 } else if (option === 'Top') {
-                    if (objects[i] instanceof Node) {
-                        ty = bounds.top + (objects[i] as Node).height / 2 - (objects[i] as Node).offsetY;
-                    } else {
-                        ty = bounds.top - (objects[i] as Connector).sourcePoint.y;
-                    }
+                    ty = bounds.top + objectBounds.height / 2 - objectBounds.center.y;
                 } else if (option === 'Bottom') {
-                    if (objects[i] instanceof Node) {
-                        ty = bounds.bottom - (objects[i] as Node).height / 2 - (objects[i] as Node).offsetY;
-                    } else {
-                        ty = bounds.bottom - (objects[i] as Connector).sourcePoint.y;
-                    }
+                    ty = bounds.bottom - objectBounds.height / 2 - objectBounds.center.y;
                 } else if (option === 'Center') {
-                    if (objects[i] instanceof Node) {
-                        tx = bounds.center.x - (objects[i] as Node).offsetX;
-                    } else {
-                        j = Math.abs(bounds.width -
-                            (objects[i] as Connector).wrapper.bounds.width);
-                        tx = bounds.bottomLeft.x - j / 2 - (objects[i] as Connector).sourcePoint.x;
-                    }
+                    tx = bounds.center.x - objectBounds.center.x;
                 } else if (option === 'Middle') {
-                    if (objects[i] instanceof Node) {
-                        ty = bounds.center.y - (objects[i] as Node).offsetY;
-                    } else {
-                        ty = bounds.center.y - (objects[i] as Connector).sourcePoint.y;
-                    }
+                    ty = bounds.center.y - objectBounds.center.y;
                 }
-
                 undoObj = this.storeObject(undoObj, objects[i]);
-
                 this.drag(objects[i], tx, ty);
                 this.diagram.updateSelector();
                 redoObj = this.storeObject(redoObj, objects[i]);

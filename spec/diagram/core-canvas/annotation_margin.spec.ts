@@ -39,7 +39,7 @@ describe('Diagram Control', () => {
             annotation = {
                 content: 'top left margin, top left alignment, offset 0', offset: { x: 0, y: 0 },
                 horizontalAlignment: 'Left', verticalAlignment: 'Top', margin: { left: 15, top: 10 },
-                style: style
+                style: style, width: 85
             };
 
             node.annotations = [annotation];
@@ -53,7 +53,7 @@ describe('Diagram Control', () => {
                 content: 'bottom right margin bottom right alignment, offset 1', offset: { x: 1, y: 1 },
                 horizontalAlignment: 'Right', verticalAlignment: 'Bottom',
                 margin: { right: 15, bottom: 15 },
-                style: style
+                style: style, width: 85
             };
             node2.annotations = [annotation];
 
@@ -126,12 +126,14 @@ describe('Diagram Control', () => {
             (diagram.nodes[0] as NodeModel).annotations[0].horizontalAlignment = 'Left';
             (diagram.nodes[0] as NodeModel).annotations[0].verticalAlignment = 'Top';
             (diagram.nodes[0] as NodeModel).annotations[0].margin = { top: 10, left: 0 };
+            (diagram.nodes[0] as NodeModel).annotations[0].width = 100;
 
             (diagram.nodes[1] as NodeModel).annotations[0].content = 'right margin, bottom right alignment, offset 1';
             (diagram.nodes[1] as NodeModel).annotations[0].offset = { x: 1, y: 1 };
             (diagram.nodes[1] as NodeModel).annotations[0].horizontalAlignment = 'Right';
             (diagram.nodes[1] as NodeModel).annotations[0].verticalAlignment = 'Bottom';
             (diagram.nodes[1] as NodeModel).annotations[0].margin = { right: 15, bottom: 0 };
+            (diagram.nodes[1] as NodeModel).annotations[0].width = 85;
 
 
             (diagram.nodes[2] as NodeModel).annotations[0].content = 'bottom margin, bottom right alignment, offset 1';

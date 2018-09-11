@@ -6,7 +6,7 @@ import { PointModel } from '../primitives/point-model';
  */
 /** @private */
 export function processPathData(data: string): Object[] {
-    let collection: Object[] = [];
+    let collection: Object[] = []; let j: number;
     let arrayCollection: Object[] = parsePathData(data);
     if (arrayCollection.length > 0) {
         for (let i: number = 0; i < arrayCollection.length; i++) {
@@ -15,34 +15,64 @@ export function processPathData(data: string): Object[] {
             char = ob[0];
             switch (char.toLowerCase()) {
                 case 'm':
-                    collection.push({ command: char, x: ob[1], y: ob[2] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, x: ob[j], y: ob[j + 1] });
+                        j = j + 1;
+                        if (char === 'm') {
+                            char = 'l';
+                        } else if (char === 'M') {
+                            char = 'L';
+                        }
+                    }
                     break;
                 case 'l':
                 case 't':
-                    collection.push({ command: char, x: ob[1], y: ob[2] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, x: ob[j], y: ob[j + 1] });
+                        j = j + 1;
+                    }
                     break;
                 case 'h':
-                    collection.push({ command: char, x: ob[1] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, x: ob[j] });
+                    }
                     break;
                 case 'v':
-                    collection.push({ command: char, y: ob[1] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, y: ob[j] });
+                    }
                     break;
                 case 'z':
                     collection.push({ command: char });
                     break;
                 case 'c':
-                    collection.push({ command: char, x1: ob[1], y1: ob[2], x2: ob[3], y2: ob[4], x: ob[5], y: ob[6] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({
+                            command: char, x1: ob[j], y1: ob[j + 1], x2: ob[j + 2], y2: ob[j + 3], x: ob[j + 4], y: ob[j + 5]
+                        });
+                        j = j + 5;
+                    }
                     break;
                 case 's':
-                    collection.push({ command: char, x2: ob[1], y2: ob[2], x: ob[3], y: ob[4] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, x2: ob[j], y2: ob[j + 1], x: ob[j + 2], y: ob[j + 3] });
+                        j = j + 3;
+                    }
                     break;
                 case 'q':
-                    collection.push({ command: char, x1: ob[1], y1: ob[2], x: ob[3], y: ob[4] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({ command: char, x1: ob[j], y1: ob[j + 1], x: ob[j + 2], y: ob[j + 3] });
+                        j = j + 3;
+                    }
                     break;
                 case 'a':
-                    let l: boolean = ob[4];
-                    let s: boolean = ob[5];
-                    collection.push({ command: char, r1: ob[1], r2: ob[2], angle: ob[3], largeArc: l, sweep: s, x: ob[6], y: ob[7] });
+                    for (j = 1; j < (ob as Object[]).length; j++) {
+                        collection.push({
+                            command: char, r1: ob[j], r2: ob[j + 1], angle: ob[j + 2], largeArc: ob[j + 3],
+                            sweep: ob[j + 4], x: ob[j + 5], y: ob[j + 6]
+                        });
+                        j = j + 6;
+                    }
                     break;
             }
         }

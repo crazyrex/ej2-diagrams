@@ -500,6 +500,17 @@ export type TextOverflow =
     'Clip';
 
 /**
+ * Defines the mode of the alignment based on which the elements should be aligned
+ * Object - Aligns the objects based on the first object in the selected list
+ * Selector - Aligns the objects based on the  the selector bounds
+ */
+export type AlignmentMode =
+    /** Object - Aligns the objects based on the first object in the selected list */
+    'Object' |
+    /** Selector - Aligns the objects based on the  the selector bounds */
+    'Selector';
+
+/**
  * Defines the alignment options
  * Left - Aligns the objects at the left of the selector bounds
  * Right - Aligns the objects at the right of the selector bounds
@@ -699,7 +710,12 @@ export enum ConnectorConstraints {
  * Enables/Disables the annotation constraints
  * ReadOnly - Enables/Disables the ReadOnly Constraints
  * InheritReadOnly - Enables/Disables the InheritReadOnly Constraints
- * Default - Enables/Disables Default constraints
+ * Select -Enables/Disable select support for the annotation
+ * Drag - Enables/Disable drag support for the annotation
+ * Resize - Enables/Disable resize support for the annotation
+ * Rotate - Enables/Disable rotate support for the annotation
+ * Interaction - Enables annotation to inherit the interaction option
+ * None - Disable all annotation constraints
  * @aspNumberEnum
  * @IgnoreSingular
  */
@@ -708,6 +724,18 @@ export enum AnnotationConstraints {
     ReadOnly = 1 << 1,
     /** Enables/Disables the InheritReadOnly Constraints */
     InheritReadOnly = 1 << 2,
+    /** Enables/Disable select support for the annotation */
+    Select = 1 << 3,
+    /** Enables/Disable drag support for the annotation */
+    Drag = 1 << 4,
+    /** Enables/Disable resize support for the annotation */
+    Resize = 1 << 5,
+    /** Enables/Disable rotate support for the annotation */
+    Rotate = 1 << 6,
+    /** Enables annotation to inherit the interaction option */
+    Interaction = 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6,
+    /** Disable all annotation Constraints */
+    None = 0
 }
 
 /**
@@ -858,6 +886,7 @@ export enum ThumbsConstraints {
  * PanX - Enables/Disable PanX support for the diagram
  * PanY - Enables/Disable PanY support for the diagram
  * Pan - Enables/Disable Pan support the diagram
+ * ZoomTextEdit - Enables/Disables zooming the text box while editing the text
  * Default - Enables/Disable all constraints
  * @aspNumberEnum
  * @IgnoreSingular
@@ -885,6 +914,8 @@ export enum DiagramConstraints {
     PanY = 1 << 8,
     /** Enables/Disable Pan support the diagram */
     Pan = 1 << 7 | 1 << 8,
+    /** Enables/Disables zooming the text box while editing the text */
+    ZoomTextEdit = 1 << 9,
     /** Enables/Disable all constraints */
     Default = 1 << 2 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 8
 }
@@ -896,7 +927,7 @@ export enum DiagramConstraints {
  * MultipleSelect - Enables/Disable MultipleSelect select support for the diagram
  * ZoomPan - Enables/Disable ZoomPan support for the diagram
  * DrawOnce - Enables/Disable continuousDraw support for the diagram 
- * continuousDraw - Enables/Disable continuousDraw support for the diagram
+ * ContinuousDraw - Enables/Disable continuousDraw support for the diagram
  * Default - Enables/Disable all constraints
  * @aspNumberEnum
  * @IgnoreSingular
@@ -1202,11 +1233,11 @@ export type BpmnShapes =
 /**
  * Defines the type of the Bpmn Events
  * Start - Sets the type of the Bpmn Event as Start
- * Start - Sets the type of the Bpmn Event as Intermediate
- * Start - Sets the type of the Bpmn Event as End
- * Start - Sets the type of the Bpmn Event as NonInterruptingStart
- * Start - Sets the type of the Bpmn Event as NonInterruptingIntermediate
- * Start - Sets the type of the Bpmn Event as ThrowingIntermediate
+ * Intermediate - Sets the type of the Bpmn Event as Intermediate
+ * End - Sets the type of the Bpmn Event as End
+ * NonInterruptingStart - Sets the type of the Bpmn Event as NonInterruptingStart
+ * NonInterruptingIntermediate - Sets the type of the Bpmn Event as NonInterruptingIntermediate
+ * ThrowingIntermediate - Sets the type of the Bpmn Event as ThrowingIntermediate
  */
 export type BpmnEvents =
     /** Sets the type of the Bpmn Event as Start */
@@ -1470,6 +1501,7 @@ export type BpmnSequenceFlows =
  * Defines the segment type of the connector
  * Straight - Sets the segment type as Straight
  * Orthogonal - Sets the segment type as Orthogonal
+ * Polyline - Sets the segment type as Polyline
  * Bezier - Sets the segment type as Bezier
  */
 export type Segments =
@@ -1477,6 +1509,8 @@ export type Segments =
     'Straight' |
     /** Orthogonal - Sets the segment type as Orthogonal */
     'Orthogonal' |
+    /** Polyline - Sets the segment type as Polyline */
+    'Polyline' |
     /** Bezier - Sets the segment type as Bezier */
     'Bezier';
 
@@ -1599,7 +1633,11 @@ export type EntryType =
     /** LabelCollectionChanged - Sets the entry type as LabelCollectionChanged */
     'LabelCollectionChanged' |
     /** PortCollectionChanged - Sets the entry type as PortCollectionChanged */
-    'PortCollectionChanged';
+    'PortCollectionChanged' |
+    /** PortPositionChanged - Sets the entry type as PortPositionChanged */
+    'PortPositionChanged' |
+    /** AnnotationPropertyChanged - Sets the entry type as AnnotationPropertyChanged */
+    'AnnotationPropertyChanged';
 /**
  * Defines the entry category type
  * Internal - Sets the entry category type as Internal
@@ -1956,15 +1994,28 @@ export enum Keys {
 }
 /**
  * Enables/Disables certain actions of diagram
- * @private
+ * * Render - Indicates the diagram is in render state.
+ * * PublicMethod - Indicates the diagram public method is in action.
+ * * ToolAction - Indicates the diagram Tool is in action.
+ * * UndoRedo - Indicates the diagram undo/redo is in action.
+ * * TextEdit - Indicates the text editing is in progress.
+ * * Group - Indicates the group is in progress.
+ * * Clear - Indicates diagram have clear all. 
  */
 export enum DiagramAction {
+    /** Indicates the diagram is in render state.r */
     Render = 1 << 1,
+    /** Indicates the diagram public method is in action. */
     PublicMethod = 1 << 2,
+    /** Indicates the diagram Tool is in action. */
     ToolAction = 1 << 3,
+    /** Indicates the diagram undo/redo is in action. */
     UndoRedo = 1 << 4,
+    /** Indicates the text editing is in progress. */
     TextEdit = 1 << 5,
+    /** Indicates the group is in progress. */
     Group = 1 << 6,
+    /** Indicates diagram have clear all. */
     Clear = 1 << 7
 }
 

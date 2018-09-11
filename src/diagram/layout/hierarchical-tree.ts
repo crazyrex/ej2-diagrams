@@ -1093,7 +1093,7 @@ export class HierarchicalTree {
         let layoutInfo: LayoutInfo;
         layoutInfo = layout.graphNodes[node.id];
         let j: number;
-        if (node.outEdges && node.outEdges.length && node.isExpanded) {
+        if (node.outEdges && node.outEdges.length && (node.isExpanded || !this.isAnimation)) {
             for (j = 0; j < node.outEdges.length; j++) {
                 let edge: INode;
                 edge = layout.nameTable[layout.nameTable[node.outEdges[j]].targetID];
@@ -1368,26 +1368,27 @@ export class HierarchicalTree {
         let nodeBounds: Rect = this.getBounds(node);
         let targetBounds: Rect = this.getBounds(target);
         let info: LayoutInfo = layout.graphNodes[node.id];
-        if (node.offsetX > target.offsetX) {
+        let startingPoint: PointModel; let endPoint: PointModel;
+        let horizontalSpacing: number; let verticalSpacing: number;
+        if (layout.orientation.indexOf('Top') !== -1) {
+            startingPoint = (node.offsetY < target.offsetY) ? nodeBounds.bottomCenter : nodeBounds.topCenter;
+            verticalSpacing = layout.verticalSpacing / 4 * ((node.offsetY < target.offsetY) ? 1 : -1);
+            horizontalSpacing = layout.horizontalSpacing / 2 * ((node.offsetX > target.offsetX) ? 1 : -1);
+            endPoint = (node.offsetX > target.offsetX) ? targetBounds.middleRight : targetBounds.middleLeft;
             points.push(
-                nodeBounds.bottomCenter,
-                { x: nodeBounds.bottomCenter.x, y: (nodeBounds.bottomCenter.y + layout.verticalSpacing / 4) },
-                {
-                    x: (targetBounds.middleRight.x + layout.horizontalSpacing / 2),
-                    y: (nodeBounds.bottomCenter.y + layout.verticalSpacing / 4)
-                },
-                { x: (targetBounds.middleRight.x + layout.horizontalSpacing / 2), y: targetBounds.middleRight.y },
-                targetBounds.middleRight);
+                startingPoint, { x: startingPoint.x, y: startingPoint.y + verticalSpacing },
+                { x: endPoint.x + horizontalSpacing, y: startingPoint.y + verticalSpacing },
+                { x: endPoint.x + horizontalSpacing, y: endPoint.y }, endPoint);
         } else {
+            startingPoint = (node.offsetX > target.offsetX) ? nodeBounds.middleLeft : nodeBounds.middleRight;
+            endPoint = node.offsetY > target.offsetY ? targetBounds.bottomCenter : targetBounds.topCenter;
+            horizontalSpacing = layout.horizontalSpacing / 4 * ((node.offsetX < target.offsetX) ? 1 : -1);
+            verticalSpacing = layout.verticalSpacing / 2 * ((node.offsetY > target.offsetY) ? 1 :  -1);
             points.push(
-                nodeBounds.bottomCenter,
-                { x: nodeBounds.bottomCenter.x, y: (nodeBounds.bottomCenter.y + layout.verticalSpacing / 4) },
-                {
-                    x: (targetBounds.middleLeft.x - layout.horizontalSpacing / 2),
-                    y: (nodeBounds.bottomCenter.y + layout.verticalSpacing / 4)
-                },
-                { x: (targetBounds.middleLeft.x - layout.horizontalSpacing / 2), y: targetBounds.middleLeft.y },
-                targetBounds.middleLeft);
+                startingPoint,
+                { x: startingPoint.x + horizontalSpacing, y: startingPoint.y },
+                { x: startingPoint.x + horizontalSpacing, y: startingPoint.y + verticalSpacing },
+                { x: endPoint.x, y: startingPoint.y + verticalSpacing }, endPoint);
         }
         this.getSegmentsFromPoints(points, connector);
     }
@@ -1439,7 +1440,7 @@ export class HierarchicalTree {
                 }
                 break;
             case 'RightToLeft':
-                point = {x: (nodeBounds.middleLeft.x - layout.verticalSpacing / 4),  y: nodeBounds.middleRight.y };
+                point = { x: (nodeBounds.middleLeft.x - layout.verticalSpacing / 4), y: nodeBounds.middleRight.y };
                 segment = new OrthogonalSegment(connector, 'segments', { type: 'Orthogonal' }, true);
                 segment.direction = Point.direction(nodeBounds.middleLeft, point) as Direction;
                 segment.length = Point.distancePoints(nodeBounds.middleLeft, point);

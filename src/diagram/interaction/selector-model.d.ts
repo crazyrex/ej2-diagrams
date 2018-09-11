@@ -1,4 +1,4 @@
-import { Property, ChildProperty, Collection, Complex } from '@syncfusion/ej2-base';import { IElement } from '../objects/interface/IElement';import { Container } from '../core/containers/container';import { Node } from '../objects/node';import { Connector } from '../objects/connector';import { PointModel } from '../primitives/point-model';import { Point } from '../primitives/point';import { Size } from '../primitives/size';import { RubberBandSelectionMode, Side, ThumbsConstraints } from '../enum/enum';import { SelectorConstraints, HorizontalAlignment, VerticalAlignment } from '../enum/enum';import { NodeModel } from '../objects/node-model';import { ConnectorModel } from '../objects/connector-model';import { Diagram } from '../../diagram/diagram';import { MarginModel } from '../core/appearance-model';import { Margin } from '../core/appearance';
+import { Property, ChildProperty, Collection, Complex } from '@syncfusion/ej2-base';import { IElement } from '../objects/interface/IElement';import { Container } from '../core/containers/container';import { Node } from '../objects/node';import { Connector } from '../objects/connector';import { PointModel } from '../primitives/point-model';import { Point } from '../primitives/point';import { Size } from '../primitives/size';import { RubberBandSelectionMode, Side, ThumbsConstraints } from '../enum/enum';import { SelectorConstraints, HorizontalAlignment, VerticalAlignment } from '../enum/enum';import { NodeModel } from '../objects/node-model';import { ConnectorModel } from '../objects/connector-model';import { Diagram } from '../../diagram/diagram';import { MarginModel } from '../core/appearance-model';import { Margin } from '../core/appearance';import { ShapeAnnotationModel, PathAnnotationModel } from '../objects/annotation-model';import { DiagramElement } from '..';
 
 /**
  * Interface for a class UserHandle
@@ -24,7 +24,11 @@ export interface UserHandleModel {
     backgroundColor?: string;
 
     /**
-     * Defines the side of user Handle 
+     * Defines the position of user Handle
+     *  * Top - Aligns the user handles at the top of an object
+     *  * Bottom - Aligns the user handles at the bottom of an object
+     *  * Left - Aligns the user handles at the left of an object
+     *  * Right - Aligns the user handles at the right of an object
      * @default 'top'
      */
     side?: Side;
@@ -78,13 +82,23 @@ export interface UserHandleModel {
     margin?: MarginModel;
 
     /**
-     * Defines the horizontalAlignment of user Handle 
+     * Defines the horizontal alignment of the user handle
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Left - Aligns the diagram element at the left of its immediate parent
+     * * Right - Aligns the diagram element at the right of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Center'
      */
     horizontalAlignment?: HorizontalAlignment;
 
     /**
-     * Defines the verticalAlignment of user Handle 
+     * Defines the vertical alignment of the user handle
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Top - Aligns the diagram element at the top of its immediate parent
+     * * Bottom - Aligns the diagram element at the bottom of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Center'
      */
     verticalAlignment?: VerticalAlignment;
@@ -133,13 +147,13 @@ export interface SelectorModel {
     rotateAngle?: number;
 
     /**
-     * Sets the position of the container
+     * Sets the positionX of the container
      * @default 0
      */
     offsetX?: number;
 
     /**
-     * Sets the position of the container
+     * Sets the positionY of the container
      * @default 0
      */
     offsetY?: number;
@@ -152,18 +166,69 @@ export interface SelectorModel {
 
     /**
      * Defines how to pick the objects to be selected using rubber band selection
+     * * CompleteIntersect - Selects the objects that are contained within the selected region
+     * * PartialIntersect - Selects the objects that are partially intersected with the selected region
      * @default 'CompleteIntersect'
      */
     rubberBandSelectionMode?: RubberBandSelectionMode;
 
     /**
-     * Defines the collection of user handle connectors
+     * Defines the collection of user handle
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let nodes: NodeModel[] = [{
+     *           id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     *           annotations: [{ content: 'Default Shape' }]
+     *       },
+     *       {
+     *           id: 'node2', width: 100, height: 100, offsetX: 300, offsetY: 100,
+     *           shape: {
+     *               type: 'Basic', shape: 'Ellipse'
+     *           },
+     *           annotations: [{ content: 'Path Element' }]
+     *       }
+     *       ];
+     *       let connectors: ConnectorModel[] = [{
+     *           id: 'connector1',
+     *           type: 'Straight',
+     *           sourcePoint: { x: 100, y: 300 },
+     *           targetPoint: { x: 200, y: 400 },
+     *       }];
+     * let handle: UserHandleModel[] = [
+     * { name: 'handle', margin: { top: 0, bottom: 0, left: 0, right: 0 }, offset: 0,
+     * pathData: 'M 376.892,225.284L 371.279,211.95L 376.892,198.617L 350.225,211.95L 376.892,225.284 Z',
+     * side: 'Top', horizontalAlignment: 'Center', verticalAlignment: 'Center', 
+     * pathColor: 'yellow' }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     *     connectors: connectors, nodes: nodes,
+     *     selectedItems: { constraints: SelectorConstraints.All, userHandles: handle },
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default []
      */
     userHandles?: UserHandleModel[];
 
     /**
-     * Defines how to pick the objects to be selected 
+     * Controls the visibility of selector.
+     * * None - Hides all the selector elements
+     * * ConnectorSourceThumb - Shows/hides the source thumb of the connector
+     * * ConnectorTargetThumb - Shows/hides the target thumb of the connector
+     * * ResizeSouthEast - Shows/hides the bottom right resize handle of the selector
+     * * ResizeSouthWest - Shows/hides the bottom left resize handle of the selector
+     * * ResizeNorthEast - Shows/hides the top right resize handle of the selector
+     * * ResizeNorthWest - Shows/hides the top left resize handle of the selector
+     * * ResizeEast - Shows/hides the middle right resize handle of the selector
+     * * ResizeWest - Shows/hides the middle left resize handle of the selector
+     * * ResizeSouth - Shows/hides the bottom center resize handle of the selector
+     * * ResizeNorth - Shows/hides the top center resize handle of the selector
+     * * Rotate - Shows/hides the rotate handle of the selector
+     * * UserHandles - Shows/hides the user handles of the selector
+     * * Resize - Shows/hides all resize handles of the selector
      * @default 'All'
      * @aspNumberEnum 
      */

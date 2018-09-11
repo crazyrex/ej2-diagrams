@@ -16,6 +16,22 @@ export class DiagramElement {
 
     /**
      * Sets/Gets the reference point of the element
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let stackPanel: StackPanel = new StackPanel();
+     * stackPanel.offsetX = 300; stackPanel.offsetY = 200;
+     * stackPanel.width = 100; stackPanel.height = 100;
+     * stackPanel.style.fill = 'red';
+     * stackPanel.pivot = { x: 0.5, y: 0.5 };
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * basicElements: [stackPanel],
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     public pivot: PointModel = { x: 0.5, y: 0.5 };
 
@@ -86,21 +102,35 @@ export class DiagramElement {
 
     /**
      * Sets/Gets how the element has to be horizontally arranged with respect to its immediate parent
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Left - Aligns the diagram element at the left of its immediate parent
+     * * Right - Aligns the diagram element at the right of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      */
     public horizontalAlignment: HorizontalAlignment = 'Auto';
 
     /**
      * Sets/Gets how the element has to be vertically arranged with respect to its immediate parent
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Top - Aligns the diagram element at the top of its immediate parent
+     * * Bottom - Aligns the diagram element at the bottom of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      */
     public verticalAlignment: VerticalAlignment = 'Auto';
 
     /**
      * Sets whether the element has to be aligned with respect to a point/with respect to its immediate parent
+     * * Point - Diagram elements will be aligned with respect to a point
+     * * Object - Diagram elements will be aligned with respect to its immediate parent
      */
     public relativeMode: RelativeMode = 'Point';
 
     /**
      * Sets whether the element has to be transformed based on its parent or not
+     * * Self - Sets the transform type as Self
+     * * Parent - Sets the transform type as Parent
      */
     public transform: Transform = Transform.Self | Transform.Parent;
 
@@ -133,7 +163,7 @@ export class DiagramElement {
     /**
      * Gets/Sets the corners of the rectangular bounds
      */
-    public corners: Rect = new Rect(0, 0, 0, 0);
+    public corners: Corners;
 
     /**
      * Defines the appearance of the shadow of the element
@@ -266,4 +296,23 @@ export class DiagramElement {
         return desiredSize;
     }
 
+}
+
+/** @private */
+export interface Corners {
+    topLeft: PointModel;
+    topCenter: PointModel;
+    topRight: PointModel;
+    middleLeft: PointModel;
+    center: PointModel;
+    middleRight: PointModel;
+    bottomLeft: PointModel;
+    bottomCenter: PointModel;
+    bottomRight: PointModel;
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    width: number;
+    height: number;
 }

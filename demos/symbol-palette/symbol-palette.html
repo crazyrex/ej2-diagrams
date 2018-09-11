@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta charset="utf-8" />
 
-    <script data-main="symbol-palette" src="../../node_modules/requirejs/require.js"></script>
+    <script id = 'loadscript' data-main="symbol-palette" src="../../node_modules/requirejs/require.js"></script>
     <link href="../../styles/material.css" rel="stylesheet" />
     <script src="../require.config.js"></script>
     <style>
@@ -18,18 +18,24 @@
 
 <body>
     <div>
-        <div id="toolbar" style="height:50px; padding:5px; margin:5px;">
+        <div id="toolbar" style="height:50px;">
             Symbol Size
-            <input id="symbolsize" type="checkbox" /> &nbsp;&nbsp;&nbsp;&nbsp; Custom Size
-            <input id="customsize" type="checkbox" /> &nbsp;&nbsp;&nbsp;&nbsp; Description
-            <input id="description" type="checkbox" /> &nbsp;&nbsp;&nbsp;&nbsp; Fit
+            <input id="symbolsize" type="checkbox" /> Custom Size
+            <input id="customsize" type="checkbox" /> Description
+            <input id="description" type="checkbox" /> Fit
             <input id="fit" type="checkbox" />
             <button id="additem"> add </button>
             <button id="removeitem"> remove </button>
+            <input id="animation" type="checkbox" /> animation
+            <input id="expand" type="checkbox" /> expand
         </div>
-        <div>
-            <div id="symbolpalette" style="width:25%;height:550px; float:left"></div>
-            <div id="diagram" style="width:74%;height:550px;float:right;"></div>
+        <div id="diagrampalette" style="width:100%; ">
+
+                <div style="width:600px;height:500px; float:left">
+            <div id="symbolpalette"></div> </div>
+            <div  style="width:500px;height:500px;float:right;">
+            <div id="diagram"></div>
+        </div>
         </div>
     </div>
 </body>

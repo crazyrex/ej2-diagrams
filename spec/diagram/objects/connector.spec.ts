@@ -960,16 +960,437 @@ describe('Diagram Control', () => {
         it('Checking connector docking - rotated source and target nodes', function (done) {
             expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 325 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 205 &&
                 (diagram.connectors[0] as Connector).intermediatePoints[1].x == 284 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 205).toBe(true);
-            
+
             expect((diagram.connectors[1] as Connector).intermediatePoints[0].x == 658.69 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 177.19 &&
                 (diagram.connectors[1] as Connector).intermediatePoints[1].x == 696.31 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 257.81).toBe(true);
-            
-             expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 290.5 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 481.24 &&
+
+            expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 290.5 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 481.24 &&
                 (diagram.connectors[2] as Connector).intermediatePoints[1].x == 348.49 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 465.7).toBe(true);
-            
-             expect((diagram.connectors[3] as Connector).intermediatePoints[0].x == 405.97 && (diagram.connectors[3] as Connector).intermediatePoints[0].y == 46.98 &&
+
+            expect((diagram.connectors[3] as Connector).intermediatePoints[0].x == 405.97 && (diagram.connectors[3] as Connector).intermediatePoints[0].y == 46.98 &&
                 (diagram.connectors[3] as Connector).intermediatePoints[1].x == 391.18 && (diagram.connectors[3] as Connector).intermediatePoints[1].y == 78.7).toBe(true);
-            
+
+            done();
+        });
+
+    });
+
+    describe('Connectors connect to rotate nodes', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramOrthoChangeSourcePoint' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [{
+                    id: 'NewIdea', width: 150, height: 60, offsetX: 355, offsetY: 205, rotateAngle: 90,
+                    shape: { type: 'Flow', shape: 'Terminator' },
+                    annotations: [{
+                        id: 'label1', content: 'New idea identified', offset: { x: 0.5, y: 0.5 }
+                    }],
+                },
+                {
+                    id: 'Meeting', width: 150, height: 60, offsetX: 254, offsetY: 205, rotateAngle: 90,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label2', content: 'Meeting with board', offset: { x: 0.5, y: 0.5 }
+                    }]
+                },
+                {
+                    id: 'BoardDecision', width: 150, height: 60, offsetX: 646, offsetY: 150, rotateAngle: 335,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label3', content: 'Board decides whether to proceed', offset: { x: 0.5, y: 0.5 },
+                        margin: { left: 25, right: 25 },
+                        style: { whiteSpace: 'PreserveAll' }
+                    }]
+                },
+                {
+                    id: 'Project', width: 150, height: 60, offsetX: 709, offsetY: 285, rotateAngle: 335,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label4', content: 'Find Project manager', offset: { x: 0.5, y: 0.5 },
+                    }]
+                },
+                {
+                    id: 'End', width: 150, height: 60, offsetX: 377.46, offsetY: 457.94, rotateAngle: 255,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label5', content: 'Implement and Deliver', offset: { x: 0.5, y: 0.5 },
+                    }]
+                },
+                {
+                    id: 'Resources', width: 150, height: 60, offsetX: 261.53, offsetY: 489, rotateAngle: 255,
+                    shape: { type: 'Flow', shape: 'Process' },
+                    annotations: [{
+                        id: 'label8', content: 'Hire new resources', offset: { x: 0.5, y: 0.5 },
+                    }]
+                }
+                ],
+                connectors: [
+                    { id: 'connector1', type: 'Orthogonal', sourceID: 'NewIdea', targetID: 'Meeting' },
+                    { id: 'connector2', type: 'Orthogonal', sourceID: 'BoardDecision', targetID: 'Project' },
+                    { id: 'connector3', type: 'Orthogonal', sourceID: 'Resources', targetID: 'End' }
+                ],
+                getConnectorDefaults: (obj: ConnectorModel) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramOrthoChangeSourcePoint');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking connector docking - rotated source and target nodes', function (done) {
+            expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 325 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 205 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 284 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 205).toBe(true);
+
+            expect((diagram.connectors[1] as Connector).intermediatePoints[0].x == 658.68 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 177.19 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 658.68 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 228.89 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 696.32 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 228.89 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[3].x == 696.32 && (diagram.connectors[1] as Connector).intermediatePoints[3].y == 257.81).toBe(true);
+
+            expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 290.5 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 481.24 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 310.5 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 481.24 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 310.5 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 465.7 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 348.49 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 465.7).toBe(true);
+
+            done();
+        });
+
+    });
+
+    describe('Connectors docking - decision shapes', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramOrthoDecisionShapes' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [
+                    {
+                        id: 'BoardDecision', width: 100, height: 100, offsetX: 218.99000000000012, offsetY: 201.8299999999998, rotateAngle: 40,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label3', content: 'Board decides whether to proceed', offset: { x: 0.5, y: 0.5 },
+                            margin: { left: 25, right: 25 },
+                            style: { whiteSpace: 'PreserveAll' }
+                        }]
+                    },
+                    {
+                        id: 'Project', width: 100, height: 100, offsetX: 309.0100000000001, offsetY: 94.64999999999982, rotateAngle: 40,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label4', content: 'Find Project manager', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    },
+                    {
+                        id: 'Meeting1', width: 100, height: 100, offsetX: 737.97, offsetY: 484.68, rotateAngle: 140,
+                        shape: { type: 'Flow', shape: 'Process' },
+                        annotations: [{
+                            id: 'label2', content: 'Meeting with board1', offset: { x: 0.5, y: 0.5 }
+                        }]
+                    },
+                    {
+                        id: 'BoardDecision1', width: 100, height: 100, offsetX: 657.56, offsetY: 389.04, rotateAngle: 140,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label3', content: 'Board decides whether to proceed1', offset: { x: 0.5, y: 0.5 },
+                            margin: { left: 25, right: 25 },
+                            style: { whiteSpace: 'PreserveAll' }
+                        }]
+                    },
+                    {
+                        id: 'Project1', width: 100, height: 100, offsetX: 561.16, offsetY: 274.05, rotateAngle: 140,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label4', content: 'Find Project manager1', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    },
+                ],
+                connectors: [
+                    { id: 'connector1', type: 'Orthogonal', sourceID: 'Project', targetID: 'BoardDecision' },
+                    {
+                        id: 'connector2', type: 'Orthogonal', sourceID: 'Meeting1', targetID: 'BoardDecision1'
+                    },
+                    {
+                        id: 'connector3', type: 'Orthogonal', sourceID: 'BoardDecision1', targetID: 'Project1'
+                    },
+                ],
+                getConnectorDefaults: (obj: ConnectorModel) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramOrthoDecisionShapes');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking connector docking - rotated source and target nodes', function (done) {
+            debugger
+            expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 347.31 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 126.79 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 399.45 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 126.79 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 399.45 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 292.27 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[3].x == 128.55 && (diagram.connectors[0] as Connector).intermediatePoints[3].y == 292.27 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[4].x == 128.55 && (diagram.connectors[0] as Connector).intermediatePoints[4].y == 170.8 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[5].x == 182.01 && (diagram.connectors[0] as Connector).intermediatePoints[5].y == 170.8).toBe(true);
+
+            expect((diagram.connectors[1] as Connector).intermediatePoints[0].x == 776.27 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 452.54 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 828.41 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 452.54 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 828.41 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 298.6 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[3].x == 567.12 && (diagram.connectors[1] as Connector).intermediatePoints[3].y == 298.6 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[4].x == 567.12 && (diagram.connectors[1] as Connector).intermediatePoints[4].y == 421.18 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[5].x == 619.26 && (diagram.connectors[1] as Connector).intermediatePoints[5].y == 421.18).toBe(true);
+
+            expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 694.54 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 358.01 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 748 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 358.01 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 748 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 183.61 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 470.72 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 183.61 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[4].x == 470.72 && (diagram.connectors[2] as Connector).intermediatePoints[4].y == 306.19 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[5].x == 522.86 && (diagram.connectors[2] as Connector).intermediatePoints[5].y == 306.19).toBe(true);
+            done();
+        });
+
+    });
+
+    describe('Connectors docking - decision shapes 2', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramOrthoDecisionShapes' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [
+                    {
+                        id: 'Project3', width: 150, height: 100, offsetX: 367.14, offsetY: 202.68, rotateAngle: 145,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label4', content: 'Find Project manager-3', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    },
+                    {
+                        id: 'Resources3', width: 150, height: 60, offsetX: 285.75, offsetY: 86.45, rotateAngle: 145,
+                        shape: { type: 'Flow', shape: 'Process' },
+                        annotations: [{
+                            id: 'label8', content: 'Hire new resources', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    },
+
+                    {
+                        id: 'BoardDecision4', width: 150, height: 110, offsetX: 321.1, offsetY: 352.65, rotateAngle: 310,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label3', content: 'Board decides whether to proceed', offset: { x: 0.5, y: 0.5 },
+                            margin: { left: 25, right: 25 },
+                            style: { whiteSpace: 'PreserveAll' }
+                        }]
+                    }, {
+                        id: 'Project4', width: 150, height: 100, offsetX: 435.98, offsetY: 448.99, rotateAngle: 310,
+                        shape: { type: 'Flow', shape: 'Decision' },
+                        annotations: [{
+                            id: 'label4', content: 'Find Project manager4', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    }, {
+                        id: 'Reject4', width: 150, height: 60, offsetX: 481.8, offsetY: 161.08, rotateAngle: 310,
+                        shape: { type: 'Flow', shape: 'Process' },
+                        annotations: [{
+                            id: 'label7', content: 'Reject and write report4', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    },
+                    {
+                        id: 'Resources4', width: 150, height: 60, offsetX: 596.7, offsetY: 257.4,
+                        shape: { type: 'Flow', shape: 'Process' },
+                        annotations: [{
+                            id: 'label8', content: 'Hire new resources4', offset: { x: 0.5, y: 0.5 },
+                        }]
+                    }
+                ],
+                connectors: [
+                    {
+                        id: 'connector6', type: 'Orthogonal', sourceID: 'Project3', targetID: 'Resources3'
+                    },
+                    {
+                        id: 'connector7', type: 'Orthogonal', sourceID: 'BoardDecision4', targetID: 'Reject4'
+                    },
+                    {
+                        id: 'connector8', type: 'Orthogonal', sourceID: 'Project4', targetID: 'Resources4'
+                    }
+                ],
+                getConnectorDefaults: (obj: ConnectorModel) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramOrthoDecisionShapes');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking connector docking - rotated source and target nodes', function (done) {
+            debugger
+            expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 428.21 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 159.91 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 477.26 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 159.91 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 477.26 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == -1.14 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[3].x == 187.11 && (diagram.connectors[0] as Connector).intermediatePoints[3].y == -1.14 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[4].x == 187.11 && (diagram.connectors[0] as Connector).intermediatePoints[4].y == 129.47 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[5].x == 224.31 && (diagram.connectors[0] as Connector).intermediatePoints[5].y == 129.47).toBe(true);
+
+            expect((diagram.connectors[1] as Connector).intermediatePoints[0].x == 369.31 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 295.2 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 369.31 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 239.84 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 433.59 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 239.84 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[3].x == 433.59 && (diagram.connectors[1] as Connector).intermediatePoints[3].y == 218.53).toBe(true);
+
+            expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 484.18 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 391.54 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 484.18 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 339.4 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 596.7 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 339.4 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 596.7 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 287.4
+            ).toBe(true);
+            done();
+        });
+
+    });
+
+
+    describe('Connectors docking - decision shapes(Connect to one end)', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramOrthoDecisionShapes' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [{
+                    id: 'Project10', width: 150, height: 100, offsetX: 493.4900000000005, offsetY: -9.589999999999634, rotateAngle: 50,
+                    shape: { type: 'Flow', shape: 'Decision' },
+                    annotations: [{
+                        id: 'label4', content: 'Find Project manager', offset: { x: 0.5, y: 0.5 },
+                    }]
+                }], connectors: [
+                    {
+                        id: 'connector', type: 'Orthogonal', sourcePoint: { x: 660, y: 200 }, targetID: 'Project10'
+                    },],
+                getConnectorDefaults: (obj: ConnectorModel) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramOrthoDecisionShapes');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking connector docking - rotated target node', function (done) {
+            expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 660 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 200 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 660 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 180 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 541.69 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 180 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[3].x == 541.69 && (diagram.connectors[0] as Connector).intermediatePoints[3].y == 47.86).toBe(true);
+            done();
+        });
+
+    });
+
+    describe('Connectors docking - Arrow shapes', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+        let diagramCanvas: HTMLElement;
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramOrthoDecisionShapes' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: 1000, height: 1000,
+                nodes: [
+                    {
+                        id: 'ArrowUp', width: 100, height: 100, offsetX: 100, offsetY: 100, //rotateAngle: 50,
+                        shape: { type: 'Path', data: 'M 91.01 64.56 C 84.28 26.83 67.13 0 47.03 0 C 21.06 0 0 44.77 0 100 L 9.41 100 C 9.41 55.81 26.25 20 47.03 20 C 61.82 20 74.62 38.15 80.77 64.56 L 73.43 64.56 L 80.07 82.27 L 86.71 100 L 93.36 82.27 L 100 64.56 L 91.01 64.56 z' },
+                    },
+                    {
+                        id: 'ArrowDown', width: 150, height: 60, offsetX: 500, offsetY: 300,
+                        shape: { type: 'Path', data: 'M 1.07 45.5 C 6.16 60.05 29.37 72.2 61.05 78.02 L 61.05 69.96 L 80.5 77.47 L 99.95 84.98 L 80.5 92.49 L 61.05 100 L 61.05 90.09 C 25.07 83.48 0 68.71 0 51.54 C 0 49.49 0.38 47.48 1.07 45.5 z M 100 0 L 100 11.39 C 49.62 11.39 7.97 26.25 1.03 45.58 C 0.36 43.72 0 41.82 0 39.88 C 0 17.85 44.77 0 100 0 z' },
+                    },
+                    {
+                        id: 'ArrowUp2', width: 100, height: 100, offsetX: 550, offsetY: 100, //rotateAngle: 50,
+                        shape: { type: 'Path', data: 'M 91.01 64.56 C 84.28 26.83 67.13 0 47.03 0 C 21.06 0 0 44.77 0 100 L 9.41 100 C 9.41 55.81 26.25 20 47.03 20 C 61.82 20 74.62 38.15 80.77 64.56 L 73.43 64.56 L 80.07 82.27 L 86.71 100 L 93.36 82.27 L 100 64.56 L 91.01 64.56 z' },
+                    },
+                    {
+                        id: 'ArrowDown2', width: 150, height: 60, offsetX: 300, offsetY: 300,
+                        shape: { type: 'Path', data: 'M 1.07 45.5 C 6.16 60.05 29.37 72.2 61.05 78.02 L 61.05 69.96 L 80.5 77.47 L 99.95 84.98 L 80.5 92.49 L 61.05 100 L 61.05 90.09 C 25.07 83.48 0 68.71 0 51.54 C 0 49.49 0.38 47.48 1.07 45.5 z M 100 0 L 100 11.39 C 49.62 11.39 7.97 26.25 1.03 45.58 C 0.36 43.72 0 41.82 0 39.88 C 0 17.85 44.77 0 100 0 z' },
+                    },
+                ],
+                connectors: [
+                    {
+                        id: 'connector', type: 'Orthogonal', sourceID: 'ArrowUp', targetID: 'ArrowDown'
+                    },
+                    {
+                        id: 'connector2', type: 'Orthogonal', sourcePoint: { x: 650, y: 190 }, targetID: 'ArrowUp2'
+                    },
+                    {
+                        id: 'connector3', type: 'Orthogonal', targetPoint: { x: 50, y: 190 }, sourceID: 'ArrowDown2'
+                    },
+                    {
+                        id: 'connector4', type: 'Orthogonal', targetPoint: { x: 530, y: 250 }, sourceID: 'ArrowUp2'
+                    }
+                ],
+                getConnectorDefaults: (obj: ConnectorModel) => {
+                    let connector: ConnectorModel = {};
+                    connector.constraints = ConnectorConstraints.Default | ConnectorConstraints.DragSegmentThumb;
+                    return connector;
+                },
+                snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramOrthoDecisionShapes');
+            diagramCanvas = document.getElementById(diagram.element.id + 'content');
+        });
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+        it('Checking connector docking - rotated target node', function (done) {
+            expect((diagram.connectors[0] as Connector).intermediatePoints[0].x == 100 && (diagram.connectors[0] as Connector).intermediatePoints[0].y == 70.43 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[1].x == 100 && (diagram.connectors[0] as Connector).intermediatePoints[1].y == 170 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[2].x == 500 && (diagram.connectors[0] as Connector).intermediatePoints[2].y == 170 &&
+                (diagram.connectors[0] as Connector).intermediatePoints[3].x == 500 && (diagram.connectors[0] as Connector).intermediatePoints[3].y == 273.22).toBe(true);
+            expect((diagram.connectors[1] as Connector).intermediatePoints[0].x == 650 && (diagram.connectors[1] as Connector).intermediatePoints[0].y == 190 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[1].x == 650 && (diagram.connectors[1] as Connector).intermediatePoints[1].y == 170 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[2].x == 550 && (diagram.connectors[1] as Connector).intermediatePoints[2].y == 170 &&
+                (diagram.connectors[1] as Connector).intermediatePoints[3].x == 550 && (diagram.connectors[1] as Connector).intermediatePoints[3].y == 70.43).toBe(true);
+            expect((diagram.connectors[2] as Connector).intermediatePoints[0].x == 300 && (diagram.connectors[2] as Connector).intermediatePoints[0].y == 273.22 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[1].x == 300 && (diagram.connectors[2] as Connector).intermediatePoints[1].y == 253.22 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[2].x == 50 && (diagram.connectors[2] as Connector).intermediatePoints[2].y == 253.22 &&
+                (diagram.connectors[2] as Connector).intermediatePoints[3].x == 50 && (diagram.connectors[2] as Connector).intermediatePoints[3].y == 190).toBe(true);
+            expect((diagram.connectors[3] as Connector).intermediatePoints[0].x == 550 && (diagram.connectors[3] as Connector).intermediatePoints[0].y == 70.43 &&
+                (diagram.connectors[3] as Connector).intermediatePoints[1].x == 550 && (diagram.connectors[3] as Connector).intermediatePoints[1].y == 170 && (
+                    diagram.connectors[3] as Connector).intermediatePoints[2].x == 530 && (diagram.connectors[3] as Connector).intermediatePoints[2].y == 170 &&
+                (diagram.connectors[3] as Connector).intermediatePoints[3].x == 530 && (diagram.connectors[3] as Connector).intermediatePoints[3].y == 250).toBe(true);
             done();
         });
 

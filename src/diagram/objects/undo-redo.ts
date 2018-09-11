@@ -3,7 +3,7 @@ import { DiagramModel } from '../diagram-model';
 import { HistoryEntry, History, } from '../diagram/history';
 import { SelectorModel } from '../interaction/selector-model';
 import { NodeModel } from '../objects/node-model';
-import { Node } from './node';
+import { Node, BpmnAnnotation } from './node';
 import { Connector } from './connector';
 import { ConnectorModel } from '../objects/connector-model';
 import { DiagramAction } from '../enum/enum';
@@ -12,6 +12,9 @@ import { cloneObject } from '../utility/base-util';
 import { IElement } from '../objects/interface/IElement';
 import { ShapeAnnotationModel, PathAnnotationModel } from '../objects/annotation-model';
 import { PointPortModel } from '../objects/port-model';
+import { ShapeAnnotation, PathAnnotation } from '../objects/annotation';
+import { findAnnotation, findPort } from '../utility/diagram-util';
+import { PointPort } from './port';
 
 /**
  * Undo redo function used for revert and restore the changes
@@ -194,11 +197,16 @@ export class UndoRedo {
             case 'SegmentChanged':
                 this.recordSegmentChanged(obj, diagram);
                 break;
+            case 'PortPositionChanged':
+                this.recordPortChanged(entry, diagram, false);
+                break;
+            case 'AnnotationPropertyChanged':
+                this.recordAnnotationChanged(entry, diagram, false);
+                break;
         }
         diagram.diagramActions &= ~DiagramAction.UndoRedo;
         diagram.protectPropertyChange(false);
         diagram.historyChangeTrigger(entry);
-
     }
 
     private group(historyEntry: HistoryEntry, diagram: Diagram): void {
@@ -229,6 +237,36 @@ export class UndoRedo {
                 }
             }
         }
+    }
+
+    private recordAnnotationChanged(entry: HistoryEntry, diagram: Diagram, isRedo: boolean): void {
+        let entryObject: NodeModel | ConnectorModel = ((isRedo) ? entry.redoObject : entry.undoObject) as NodeModel | ConnectorModel;
+        let oldElement: ShapeAnnotation | PathAnnotation = findAnnotation(
+            entryObject, entry.changeObjectId) as ShapeAnnotation | PathAnnotation;
+        let undoChanges: Object = diagram.commandHandler.getAnnotationChanges(diagram.nameTable[entryObject.id], oldElement);
+        let currentObject: NodeModel | ConnectorModel = diagram.nameTable[entryObject.id];
+        let currentElement: ShapeAnnotation | PathAnnotation = findAnnotation(
+            currentObject, entry.changeObjectId) as ShapeAnnotation | PathAnnotation;
+        currentElement.offset = oldElement.offset; currentElement.margin = oldElement.margin;
+        currentElement.width = oldElement.width;
+        currentElement.height = oldElement.height;
+        currentElement.rotateAngle = oldElement.rotateAngle; currentElement.margin = oldElement.margin;
+        if (currentObject instanceof Node) {
+            diagram.nodePropertyChange(currentObject as Node, {} as Node, undoChanges as Node);
+        } else {
+            diagram.connectorPropertyChange(currentObject as Connector, {} as Connector, undoChanges as Connector);
+        }
+    }
+
+    private recordPortChanged(entry: HistoryEntry, diagram: Diagram, isRedo: boolean): void {
+        let entryObject: NodeModel = ((isRedo) ? (entry.redoObject as SelectorModel).nodes[0] :
+            (entry.undoObject as SelectorModel).nodes[0]);
+        let oldElement: PointPort = findPort(entryObject, entry.changeObjectId) as PointPort;
+        let undoChanges: Object = diagram.commandHandler.getPortChanges(diagram.nameTable[entryObject.id], oldElement);
+        let currentObject: NodeModel | ConnectorModel = diagram.nameTable[entryObject.id];
+        let currentElement: PointPort = findPort(currentObject, entry.changeObjectId) as PointPort;
+        currentElement.offset = oldElement.offset;
+        diagram.nodePropertyChange(currentObject as Node, {} as Node, undoChanges as Node);
     }
 
     private recordPropertyChanged(entry: HistoryEntry, diagram: Diagram, isRedo: boolean): void {
@@ -288,7 +326,6 @@ export class UndoRedo {
             let ty: number = (obj as NodeModel).margin.top - node.margin.top;
             diagram.drag(node, tx, ty);
         } else {
-
             let tx: number = (obj as NodeModel).offsetX - node.wrapper.offsetX;
             let ty: number = (obj as NodeModel).offsetY - node.wrapper.offsetY;
             diagram.drag(node, tx, ty);
@@ -446,8 +483,12 @@ export class UndoRedo {
                 changeType = entry.changeType;
             }
             if (changeType === 'Remove') {
-                diagram.remove(obj);
-                diagram.clearSelectorLayer();
+                if ((obj as BpmnAnnotation).nodeId) {
+                    diagram.remove(diagram.nameTable[(obj as BpmnAnnotation).nodeId + '_textannotation_' + obj.id]);
+                } else {
+                    diagram.remove(obj);
+                    diagram.clearSelectorLayer();
+                }
             } else {
                 diagram.clearSelectorLayer();
                 if ((obj as Node | Connector).parentId) {
@@ -457,8 +498,12 @@ export class UndoRedo {
                     } else {
                         diagram.add(obj);
                     }
+                } else if ((obj as BpmnAnnotation).nodeId) {
+                    diagram.addTextAnnotation(obj, diagram.nameTable[(obj as BpmnAnnotation).nodeId]);
                 } else {
-                    diagram.add(obj);
+                    if (!diagram.nameTable[obj.id]) {
+                        diagram.add(obj);
+                    }
                 }
                 if ((obj as Node).processId && diagram.nameTable[(obj as Node).processId]) {
                     diagram.addProcess((obj as Node), (obj as Node).processId);
@@ -603,6 +648,12 @@ export class UndoRedo {
                 break;
             case 'SegmentChanged':
                 this.recordSegmentChanged(redoObject, diagram);
+                break;
+            case 'PortPositionChanged':
+                this.recordPortChanged(historyEntry, diagram, true);
+                break;
+            case 'AnnotationPropertyChanged':
+                this.recordAnnotationChanged(historyEntry, diagram, true);
                 break;
         }
         diagram.protectPropertyChange(false);

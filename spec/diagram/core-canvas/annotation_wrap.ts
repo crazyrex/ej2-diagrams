@@ -17,6 +17,7 @@ describe('Diagram Control', () => {
         let node: NodeModel;
         let node2: NodeModel;
         let node3: NodeModel;
+        let node4: NodeModel;
         let style: TextStyleModel = { strokeColor: 'black', opacity: 0.5, strokeWidth: 1 };
         let pathData: string = 'M540.3643,137.9336L546.7973,159.7016L570.3633,159.7296L550.7723,171.9366L558.9053,' +
             '194.9966L540.3643,179.4996L521.8223,194.9966L529.9553,171.9366' +
@@ -71,8 +72,14 @@ describe('Diagram Control', () => {
                 style: style
             };
             node3.annotations = [annotation];
+            node4 = {
+                id: 'industry1', width: 130, height: 50, offsetX: 100, offsetY: 200,
+                annotations: [{
+                    content: 'ShapeAnnotationaaaaaaaaaaaaaaaaa NoWrap', style: { textWrapping: "NoWrap", fill: 'red', strokeColor: 'red' },
+                }]
+            }
 
-            diagram = new Diagram({ mode: 'Canvas', width: '800px', height: '800px', nodes: [node, node2, node3] });
+            diagram = new Diagram({ mode: 'Canvas', width: '800px', height: '800px', nodes: [node, node2, node3, node4] });
             diagram.appendTo('#diagram48');
         });
 
@@ -102,6 +109,8 @@ describe('Diagram Control', () => {
             (diagram.nodes[2] as NodeModel).annotations[0].margin = { bottom: 15, top: 0 };
 
             diagram.dataBind();
+            var node = diagram.nodes[3]
+            var element = document.getElementById(node.wrapper.children[1].id+"_text");
 
             //first label
             expect(((diagram.nodes[0] as NodeModel).wrapper.children[1].actualSize.width === 85
@@ -117,7 +126,8 @@ describe('Diagram Control', () => {
                 ((diagram.nodes[2] as NodeModel).wrapper.children[1].actualSize.width === 100
                     && (diagram.nodes[2] as NodeModel).wrapper.children[1].actualSize.height === 42 &&
                     (diagram.nodes[2] as NodeModel).wrapper.children[1].offsetX === 500 &&
-                    (diagram.nodes[2] as NodeModel).wrapper.children[1].offsetY === 114)
+                    (diagram.nodes[2] as NodeModel).wrapper.children[1].offsetY === 114) &&
+                    element.childNodes.length===1
             ).toBe(true);
             done();
         });

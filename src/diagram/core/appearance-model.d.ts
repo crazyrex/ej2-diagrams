@@ -75,19 +75,19 @@ export interface ShadowModel {
 export interface StopModel {
 
     /**
-     * Defines the color of stop 
+     * Sets the color to be filled over the specified region
      * @default ''
      */
     color?: string;
 
     /**
-     * Defines the offset of stop
+     * Sets the position where the previous color transition ends and a new color transition starts
      * @default 0
      */
     offset?: number;
 
     /**
-     * Defines the opacity of stop
+     * Describes the transparency level of the region
      * @default 1
      */
     opacity?: number;
@@ -107,6 +107,8 @@ export interface GradientModel {
 
     /**
      * Defines the type of gradient
+     * * Linear - Sets the type of the gradient as Linear
+     * * Radial - Sets the type of the gradient as Radial
      * @default 'None'
      */
     type?: GradientType;
@@ -206,6 +208,21 @@ export interface ShapeStyleModel {
 
     /**
      * Defines the pattern of dashes and spaces to stroke the path/shape
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```
+     *  let nodes: NodeModel[] = [{  id: 'node', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     * style: { fill: 'red', strokeColor: 'blue', strokeWidth: 5, 
+     * strokeDashArray: '2 2', opacity: 0.6 } as ShapeStyleModel,
+     * }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     *   nodes: nodes,
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default ''
      */
     strokeDashArray?: string;
@@ -281,30 +298,47 @@ export interface TextStyleModel extends ShapeStyleModel{
 
     /**
      * Defines how the white space and new line characters have to be handled
+     * * PreserveAll - Preserves all empty spaces and empty lines
+     * * CollapseSpace - Collapses the consequent spaces into one
+     * * CollapseAll - Collapses all consequent empty spaces and empty lines
      * @default 'CollapseSpace'
      */
     whiteSpace?: WhiteSpace;
 
     /**
      * Defines how the text should be wrapped, when the text size exceeds some specific bounds
+     * * WrapWithOverflow - Wraps the text so that no word is broken
+     * * Wrap - Wraps the text and breaks the word, if necessary
+     * * NoWrap - Text will no be wrapped
      * @default  'WrapWithOverflow'
      */
     textWrapping?: TextWrap;
 
     /**
      * Defines how the text should be aligned within its bounds
+     * * Left - Aligns the text at the left of the text bounds
+     * * Right - Aligns the text at the right of the text bounds
+     * * Center - Aligns the text at the center of the text bounds
+     * * Justify - Aligns the text in a justified manner
      * @default 'Center'
      */
     textAlign?: TextAlign;
 
     /**
      * Defines how the text should be decorated. For example, with underline/over line
+     * * Overline - Decorates the text with a line above the text
+     * * Underline - Decorates the text with an underline
+     * * LineThrough - Decorates the text by striking it with a line
+     * * None - Text will not have any specific decoration
      * @default 'None'
      */
     textDecoration?: TextDecoration;
 
     /**
      * Defines how to handle the text when it exceeds the given size.
+     * * Wrap - Wraps the text to next line, when it exceeds its bounds
+     * * Ellipsis - It truncates the overflown text and represents the clipping with an ellipsis
+     * * Clip - It clips the overflow text
      * @default 'Wrap'
      */
     textOverflow?: TextOverflow;

@@ -1,19 +1,19 @@
 import { Property, ChildProperty, Complex } from '@syncfusion/ej2-base';
-import { Ruler, RulerOrientation, TickAlignment } from '../../ruler/index';
+import { RulerOrientation, TickAlignment } from '../../ruler/index';
 import { DiagramRulerModel } from './ruler-settings-model';
 /**
- * defines the Properties for the Diagram Ruler
+ * Defines the properties of both horizontal and vertical guides/rulers to measure the diagram area.
  */
 export abstract class DiagramRuler extends ChildProperty<DiagramRuler> {
     /**
-     * Defines the unique interval of the ruler
+     * Defines the number of intervals to be present on each segment of the ruler.
      * @default 5
      */
     @Property(5)
     public interval: number;
 
     /**
-     * Sets the segment width of the ruler
+     * Defines the textual description of the ruler segment, and the appearance of the ruler ticks of the ruler.
      * @default 100
      */
     @Property(100)
@@ -27,40 +27,75 @@ export abstract class DiagramRuler extends ChildProperty<DiagramRuler> {
     public orientation: RulerOrientation;
 
     /**
-     * Defines the alignment of the tick in the ruler
+     * Defines and sets the tick alignment of the ruler scale.
      * @default 'RightOrBottom'
      */
     @Property('RightOrBottom')
     public tickAlignment: TickAlignment;
 
     /**
-     * Defines the color of the marker
+     * Defines the color of the ruler marker brush.
      * @default 'red'
      */
     @Property('red')
     public markerColor: string;
 
     /**
-     * Defines the thickness of the ruler
+     * Defines the height of the ruler.
      * @default 25
      */
     @Property(25)
     public thickness: number;
 
     /**
-     * Sets the height of tick lines
+     * Defines the method which is used to position and arrange the tick elements of the ruler.
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let arrange: Function = (args: IArrangeTickOptions) => {
+     * if (args.tickInterval % 10 == 0) {
+     * args.tickLength = 25;
+     * }
+     * }
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * rulerSettings: { showRulers: true,
+     * horizontalRuler: { segmentWidth: 50, orientation: 'Horizontal', interval: 10,  arrangeTick: arrange },
+     * verticalRuler: {segmentWidth: 200,interval: 20, thickness: 20,
+     * tickAlignment: 'LeftOrTop', segmentWidth: 50, markerColor: 'red' }
+     * },
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default null
      */
     @Property(null)
     public arrangeTick: Function | string;
 }
 
-/**
- * Defines rulers
+/** 
+ * Defines the ruler settings of diagram
+ * ```html
+ * <div id='diagram'></div>
+ * ```
+ * ```typescript
+ * let diagram: Diagram = new Diagram({
+ * ...
+ * rulerSettings: { showRulers: true,
+ * horizontalRuler: { segmentWidth: 50,interval: 10 },
+ * verticalRuler: {segmentWidth: 200,interval: 20} 
+ * },
+ * ...
+ * });
+ * diagram.appendTo('#diagram');
+ * ```
+ * @default {}
  */
 export class RulerSettings extends ChildProperty<RulerSettings> {
     /**
-     * Sets the visibility of the ruler
+     * Enables or disables both horizontal and vertical ruler.
      * @default 'false'
      */
     @Property(false)
@@ -74,15 +109,15 @@ export class RulerSettings extends ChildProperty<RulerSettings> {
     public dynamicGrid: Boolean;
 
     /** 
-     * defines the horizontal ruler
-     * @default new DiagramRuler({})
+     * Defines the appearance of horizontal ruler
+     * @default {}
      */
     @Complex<DiagramRulerModel>({ orientation: 'Horizontal' }, DiagramRuler)
     public horizontalRuler: DiagramRulerModel;
 
     /** 
-     * defines the vertical ruler
-     * @default new DiagramRuler({})
+     * Defines the appearance of vertical ruler
+     * @default {}
      */
     @Complex<DiagramRulerModel>({ orientation: 'Vertical' }, DiagramRuler)
     public verticalRuler: DiagramRulerModel;

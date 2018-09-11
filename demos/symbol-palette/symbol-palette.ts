@@ -2,7 +2,7 @@ import {
     Diagram, NodeModel, UndoRedo, randomId, ConnectorModel, Connector, Node, BpmnDiagrams, StackPanel, DiagramElement, TextElement, PortVisibility, PortConstraints
 } from '../../src/diagram/index';
 Diagram.Inject(UndoRedo);
-
+import { ExpandMode } from '@syncfusion/ej2-navigations';
 Diagram.Inject(BpmnDiagrams);
 
 import {
@@ -108,7 +108,7 @@ let getNodeTemplate: Function = (symbol: NodeModel) => {
 };
 
 let diagram: Diagram = new Diagram({
-    width: '74%', height: '600px',
+    width: '100%', height: '500px',
     connectors: connectors, nodes: nodes,
     pageSettings: {
         background: { color: 'transparent' }
@@ -282,10 +282,10 @@ let palette: SymbolPalette = new SymbolPalette({
     expandMode: 'Multiple',
     palettes: [
         //{ id: 'scratchpad', expanded: true, symbols: [], iconCss: 'ej-icon-New scratch-pad', title: 'Scratchpad' },
-        { id: 'flow', expanded: false, symbols: getFlowShapes(), title: 'Flow Shapes' },
+        { id: 'flow', expanded: true, symbols: getFlowShapes(), title: 'Flow Shapes' },
         { id: 'basic', expanded: true, symbols: getBasicShapes(), title: 'Basic Shapes' },
-        { id: 'bpmn', expanded: false, symbols: getBPMNShapes(), title: 'BPMN Shapes' },
-        { id: 'connectors', expanded: false, symbols: getConnectors(), title: 'Connectors' }
+        { id: 'bpmn', expanded: true, symbols: getBPMNShapes(), title: 'BPMN Shapes' },
+        { id: 'connectors', expanded: true, symbols: getConnectors(), title: 'Connectors' }
     ],
     width: '100%', height: '100%', symbolHeight: 50, symbolWidth: 50,
     symbolPreview: { height: 100, width: 100 },
@@ -297,8 +297,6 @@ let palette: SymbolPalette = new SymbolPalette({
     }
 });
 palette.appendTo('#symbolpalette');
-
-
 function setPaletteNodeDefaults(node: NodeModel): void {
     if (node.id === 'Terminator' || node.id === 'Process') {
         node.width = 130;
@@ -322,6 +320,11 @@ document.getElementById('symbolsize').onchange = () => {
     palette.symbolHeight = checked ? 80 : undefined;
     palette.dataBind();
 };
+document.getElementById('animation').onchange = () => {
+    let checked = (document.getElementById('animation') as HTMLInputElement).checked;
+    palette.enableAnimation = checked;
+    palette.dataBind();
+}; 
 let shape: NodeModel;
 document.getElementById('additem').onclick = () => {
     shape = { id: 'newflow' + randomId(), shape: { type: 'Flow', shape: 'Process' } };
@@ -335,6 +338,11 @@ document.getElementById('removeitem').onclick = () => {
 };
 
 
+document.getElementById('expand').onchange = () => {
+    let checked = (document.getElementById('expand') as HTMLInputElement).value;
+    palette.expandMode = checked as ExpandMode;
+       palette.dataBind();
+};
 document.getElementById('customsize').onchange = () => {
     let checked = (document.getElementById('customsize') as HTMLInputElement).checked;
     palette.getSymbolInfo = (symbol: Node | Connector): SymbolInfo => {

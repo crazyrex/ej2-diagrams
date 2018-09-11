@@ -1,4 +1,4 @@
-import { DiagramElement } from '../core/elements/diagram-element';
+import { DiagramElement, Corners } from '../core/elements/diagram-element';
 import { Rect } from '../primitives/rect';
 import { Size } from '../primitives/size';
 import { PointModel } from '../primitives/point-model';
@@ -24,38 +24,71 @@ export function randomId(): string {
         } else {
             num = Math.floor(Math.random() * chars.length);
         }
+        if (i === 0 && num < 10) { i--; continue; }
         id += chars.substring(num, num + 1);
     }
     return id;
 }
+
+/** @private */
+export function cornersPointsBeforeRotation(ele: DiagramElement): Rect {
+    let bounds: Rect = new Rect();
+    let top: number = ele.offsetY - ele.actualSize.height * ele.pivot.y;
+    let bottom: number = ele.offsetY + ele.actualSize.height * (1 - ele.pivot.y);
+    let left: number = ele.offsetX - ele.actualSize.width * ele.pivot.x;
+    let right: number = ele.offsetX + ele.actualSize.width * (1 - ele.pivot.x);
+    let topLeft: PointModel = { x: left, y: top };
+    let topCenter: PointModel = { x: (left + right) / 2, y: top };
+    let topRight: PointModel = { x: right, y: top };
+    let middleLeft: PointModel = { x: left, y: (top + bottom) / 2 };
+    let middleRight: PointModel = { x: right, y: (top + bottom) / 2 };
+    let bottomLeft: PointModel = { x: left, y: bottom };
+    let bottomCenter: PointModel = { x: (left + right) / 2, y: bottom };
+    let bottomRight: PointModel = { x: right, y: bottom };
+    bounds = Rect.toBounds([topLeft, topRight, bottomLeft, bottomRight]);
+    return bounds;
+}
+
+
 /** @private */
 export function getBounds(element: DiagramElement): Rect {
     let bounds: Rect = new Rect();
-    let corners: Rect = new Rect();
-    let top: number = element.offsetY - element.actualSize.height * element.pivot.y;
-    let bottom: number = element.offsetY + element.actualSize.height * (1 - element.pivot.y);
-    let left: number = element.offsetX - element.actualSize.width * element.pivot.x;
-    let right: number = element.offsetX + element.actualSize.width * (1 - element.pivot.x);
-    let middleLeft: PointModel = { x: left, y: (top + bottom) / 2 };
-    let topCenter: PointModel = { x: (left + right) / 2, y: top };
-    let bottomCenter: PointModel = { x: (left + right) / 2, y: bottom };
-    let middleRight: PointModel = { x: right, y: (top + bottom) / 2 };
-    let topLeft: PointModel = { x: left, y: top };
-    let topRight: PointModel = { x: right, y: top };
-    let bottomLeft: PointModel = { x: left, y: bottom };
-    let bottomRight: PointModel = { x: right, y: bottom };
-    corners = Rect.toBounds([topLeft, topRight, bottomLeft, bottomRight]);
-    element.corners = corners;
+    let corners: Rect;
+    corners = cornersPointsBeforeRotation(element);
+    let middleLeft: PointModel = corners.middleLeft;
+    let topCenter: PointModel = corners.topCenter;
+    let bottomCenter: PointModel = corners.bottomCenter;
+    let middleRight: PointModel = corners.middleRight;
+    let topLeft: PointModel = corners.topLeft;
+    let topRight: PointModel = corners.topRight;
+    let bottomLeft: PointModel = corners.bottomLeft;
+    let bottomRight: PointModel = corners.bottomRight;
+    element.corners = {
+        topLeft: topLeft, topCenter: topCenter, topRight: topRight, middleLeft: middleLeft,
+        middleRight: middleRight, bottomLeft: bottomLeft, bottomCenter: bottomCenter, bottomRight: bottomRight
+    } as Corners;
+
     if (element.rotateAngle !== 0 || element.parentTransform !== 0) {
         let matrix: Matrix = identityMatrix();
         rotateMatrix(matrix, element.rotateAngle + element.parentTransform, element.offsetX, element.offsetY);
-        topLeft = transformPointByMatrix(matrix, topLeft);
-        topRight = transformPointByMatrix(matrix, topRight);
-        bottomLeft = transformPointByMatrix(matrix, bottomLeft);
-        bottomRight = transformPointByMatrix(matrix, bottomRight);
+        element.corners.topLeft = topLeft = transformPointByMatrix(matrix, topLeft);
+        element.corners.topCenter = topCenter = transformPointByMatrix(matrix, topCenter);
+        element.corners.topRight = topRight = transformPointByMatrix(matrix, topRight);
+        element.corners.middleLeft = middleLeft = transformPointByMatrix(matrix, middleLeft);
+        element.corners.middleRight = middleRight = transformPointByMatrix(matrix, middleRight);
+        element.corners.bottomLeft = bottomLeft = transformPointByMatrix(matrix, bottomLeft);
+        element.corners.bottomCenter = bottomCenter = transformPointByMatrix(matrix, bottomCenter);
+        element.corners.bottomRight = bottomRight = transformPointByMatrix(matrix, bottomRight);
         //Set corners based on rotate angle
     }
     bounds = Rect.toBounds([topLeft, topRight, bottomLeft, bottomRight]);
+    element.corners.left = bounds.left;
+    element.corners.right = bounds.right;
+    element.corners.top = bounds.top;
+    element.corners.bottom = bounds.bottom;
+    element.corners.center = bounds.center;
+    element.corners.width = bounds.width;
+    element.corners.height = bounds.height;
     return bounds;
 }
 
@@ -117,9 +150,13 @@ export function cloneObject(obj: Object, additionalProp?: Function | string, key
 export function getInternalProperties(propName: string): string[] {
     switch (propName) {
         case 'nodes':
-            return ['inEdges', 'outEdges', 'parentId', 'processId'];
+            return ['inEdges', 'outEdges', 'parentId', 'processId', 'nodeId'];
         case 'connectors':
             return ['parentId'];
+        case 'annotation':
+            return ['nodeId'];
+        case 'annotations':
+            return ['nodeId'];
     }
     return [];
 }

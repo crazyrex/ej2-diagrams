@@ -6,12 +6,13 @@ import { Container } from '../core/containers/container';
 import { MarginModel } from '../core/appearance-model';
 import { Diagram } from '../diagram';
 import { Connector } from '../objects/connector';
-import { NodeDrawingTool, ConnectorDrawingTool, TextDrawingTool, PolygonDrawingTool } from './tool';
+import { NodeDrawingTool, ConnectorDrawingTool, TextDrawingTool, PolygonDrawingTool, PolyLineDrawingTool } from './tool';
 import { Node } from '../objects/node';
 import { ConnectorModel } from '../objects/connector-model';
 import { PointPortModel } from '../objects/port-model';
 import { NodeModel, BpmnShapeModel, BasicShapeModel } from '../objects/node-model';
 import { ToolBase, SelectTool, MoveTool, ResizeTool, RotateTool, ConnectTool, ExpandTool, LabelTool, ZoomPanTool } from './tool';
+import { LabelDragTool, LabelResizeTool, LabelRotateTool } from './tool';
 import { ConnectorEditing } from './connector-editing';
 import { Selector } from './selector';
 import { CommandHandler } from './command-manager';
@@ -19,7 +20,7 @@ import { Actions, findToolToActivate, isSelected, getCursor, contains } from './
 import { DiagramAction, KeyModifiers, Keys, DiagramEvent, DiagramTools } from '../enum/enum';
 import { isPointOverConnector, findObjectType, insertObject, getObjectFromCollection, getTooltipOffset } from '../utility/diagram-util';
 import { getObjectType } from '../utility/diagram-util';
-import { canZoomPan, canDraw, canDrag } from './../utility/constraints-util';
+import { canZoomPan, canDraw, canDrag, canZoomTextEdit } from './../utility/constraints-util';
 import { canMove, canEnablePointerEvents, canSelect, canEnableToolTip } from './../utility/constraints-util';
 import { canOutConnect, canInConnect, canAllowDrop, canUserInteract, defaultTool } from './../utility/constraints-util';
 import { CommandModel } from '../diagram/keyboard-commands-model';
@@ -37,7 +38,9 @@ import { ITouches } from '../objects/interface/interfaces';
 import { removeRulerMarkers, drawRulerMarkers, getRulerSize, updateRuler } from '../ruler/ruler';
 import { canContinuousDraw, canDrawOnce } from '../utility/constraints-util';
 import { SelectorModel } from './selector-model';
-import { getFunction } from '../utility/base-util';
+import { getFunction, cornersPointsBeforeRotation } from '../utility/base-util';
+import { ShapeAnnotationModel, PathAnnotationModel } from '../objects/annotation-model';
+import { ShapeAnnotation, PathAnnotation } from '../objects/annotation';
 
 
 /**
@@ -60,6 +63,11 @@ export class DiagramEventHandler {
                     this.tool.mouseUp({ position: this.currentPosition });
                 }
                 this.tool = null;
+            }
+            if (action === 'Rotate' || action === 'LabelRotate') {
+                this.diagram.diagramCanvas.classList.add('e-diagram-rotate');
+            } else if (this.currentAction === 'Rotate' || this.currentAction === 'LabelRotate') {
+                this.diagram.diagramCanvas.classList.remove('e-diagram-rotate');
             }
             this.currentAction = action;
             if (this.currentAction !== 'None' && this.currentAction !== 'Select' &&
@@ -116,6 +124,8 @@ export class DiagramEventHandler {
     private hoverElement: NodeModel | ConnectorModel;
 
     private hoverNode: NodeModel;
+
+    private isScrolling: boolean;
 
     private initialEventArgs: MouseEventArgs;
     /** @private */
@@ -185,6 +195,7 @@ export class DiagramEventHandler {
             this.diagram.diagramCanvas.style.width = width;
             this.diagram.diagramCanvas.style.height = height;
             this.diagram.scroller.setSize();
+            this.diagram.transformLayers();
             if (this.diagram.rulerSettings.showRulers) {
                 updateRuler(this.diagram);
             }
@@ -230,22 +241,64 @@ export class DiagramEventHandler {
         return (navigator.platform.match('Mac') && key === 'Backspace' && value === 'delete');
     }
 
+    private isMouseOnScrollBar(evt: PointerEvent): boolean {
+        let x: number = evt.offsetX;
+        let y: number = evt.offsetY;
+        let diagramCanvas: HTMLElement = this.diagram.diagramCanvas;
+        let height: number = diagramCanvas.offsetHeight;
+        let width: number = diagramCanvas.offsetWidth;
+        let topLeft: PointModel;
+        let topRight: PointModel;
+        let bottomLeft: PointModel;
+        let bottomRight: PointModel;
+        let bounds: Rect;
+        if (height < diagramCanvas.scrollHeight) {
+            //default scrollbar width in browser is '17pixels'.
+            topLeft = { x: (width - 17), y: 0 };
+            topRight = { x: width, y: 0 };
+            bottomLeft = { x: (width - 17), y: height };
+            bottomRight = { x: width, y: height };
+            bounds = Rect.toBounds([topLeft, topRight, bottomLeft, bottomRight]);
+            if (bounds.containsPoint({ x: x, y: y })) {
+                return true;
+            }
+        }
+        if (width < diagramCanvas.scrollWidth) {
+            topLeft = { x: 0, y: (height - 17) };
+            topRight = { x: width, y: (height - 17) };
+            bottomLeft = { x: 0, y: height };
+            bottomRight = { x: width, y: height };
+            bounds = Rect.toBounds([topLeft, topRight, bottomLeft, bottomRight]);
+            if (bounds.containsPoint({ x: x, y: y })) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public mouseDown(evt: PointerEvent): void {
         this.focus = true;
         let touches: TouchList;
         touches = (<TouchEvent & PointerEvent>evt).touches;
+        if (this.isMouseOnScrollBar(evt)) {
+            this.isScrolling = true;
+            evt.preventDefault();
+            return;
+        }
         if (!this.checkEditBoxAsTarget(evt) && (canUserInteract(this.diagram)) ||
             (canZoomPan(this.diagram) && !defaultTool(this.diagram))) {
             if (this.action === 'Select' || this.action === 'Drag') {
                 this.diagram.updatePortVisibility(this.hoverElement as Node, PortVisibility.Hover, true);
             }
-            if (this.tool instanceof PolygonDrawingTool && (evt.button === 2 || evt.buttons === 2)) {
+            if (((this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool)
+                && (evt.button === 2 || evt.buttons === 2))) {
                 let arg: IClickEventArgs = {
                     element: this.diagram, position: this.currentPosition, count: evt.buttons, actualObject: this.eventArgs.actualObject
                 };
                 this.inAction = false;
-                this.tool.mouseUp(this.eventArgs, arg);
-            } else if ((this.inAction === true) && this.isMouseDown === true && this.tool instanceof PolygonDrawingTool) {
+                this.tool.mouseUp(this.eventArgs);
+            } else if (((this.inAction === true) && this.isMouseDown === true &&
+                (this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool))) {
                 this.isMouseDown = true;
                 this.eventArgs = {};
                 this.getMouseEventArgs(this.currentPosition, this.eventArgs);
@@ -255,8 +308,11 @@ export class DiagramEventHandler {
                 this.isMouseDown = true;
                 this.currentPosition = this.prevPosition = this.getMousePosition(evt);
                 this.eventArgs = {};
-                this.diagram.endEdit();
-                let target: NodeModel | PointPortModel;
+                if (this.diagram.textEditing && !this.isMouseOnScrollBar(evt)) {
+                    this.diagram.endEdit();
+                    this.diagram.textEditing = false;
+                }
+                let target: NodeModel | PointPortModel | ShapeAnnotationModel | PathAnnotationModel;
                 let objects: IElement[] = this.objectFinder.findObjectsUnderMouse(
                     this.currentPosition, this.diagram, this.eventArgs, null, this.action);
                 let obj: IElement = this.objectFinder.findObjectUnderMouse(
@@ -309,7 +365,7 @@ export class DiagramEventHandler {
     }
 
     public mouseMoveExtend(e: PointerEvent | TouchEvent, obj: IElement): void {
-        if (this.tool instanceof PolygonDrawingTool) {
+        if (this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool) {
             this.tool.mouseMove(this.eventArgs);
         }
         if (this.diagram.scrollSettings.canAutoScroll) {
@@ -336,16 +392,43 @@ export class DiagramEventHandler {
         this.hoverNode = isNode ? null : obj;
     }
 
+    /** @private */
+    public checkAction(obj: IElement): void {
+        if (this.action === 'LabelSelect' && this.eventArgs.sourceWrapper &&
+            this.eventArgs.sourceWrapper instanceof TextElement) {
+            let annotation: ShapeAnnotation | PathAnnotation = this.commandHandler.findTarget(
+                this.eventArgs.sourceWrapper, this.eventArgs.source) as ShapeAnnotation | PathAnnotation;
+            if (!isSelected(this.diagram, annotation, false, this.eventArgs.sourceWrapper) && canMove(annotation)) {
+                this.action = 'LabelDrag';
+                this.tool = this.getTool(this.action);
+                this.tool.mouseDown(this.initialEventArgs);
+            }
+        } else if (canMove(obj) && canSelect(obj) && this.initialEventArgs &&
+            this.initialEventArgs.source && this.action === 'Select') {
+            if (!isSelected(this.diagram, this.eventArgs.source, false) &&
+                this.eventArgs.source instanceof Selector) {
+                this.getMouseEventArgs(this.currentPosition, this.eventArgs);
+            }
+            if (!(obj instanceof Connector) || (obj instanceof Connector &&
+                !(contains(this.currentPosition, obj.sourcePoint, obj.hitPadding) ||
+                    contains(this.currentPosition, obj.targetPoint, obj.hitPadding)))) {
+                this.action = 'Drag';
+            }
+            this.tool = this.getTool(this.action);
+            this.tool.mouseDown(this.initialEventArgs);
+        }
+    }
 
     /** @private */
     public mouseMove(e: PointerEvent | TouchEvent, touches: TouchList): void {
         this.focus = true;
+        if (this.isScrolling) { e.preventDefault(); return; }
         if (canUserInteract(this.diagram) || (canZoomPan(this.diagram) && !defaultTool(this.diagram))) {
             this.currentPosition = this.getMousePosition(e);
             let objects: IElement[] = this.diagram.findObjectsUnderMouse(this.currentPosition);
             let obj: IElement = this.diagram.findObjectUnderMouse(objects, this.action, this.inAction);
             drawRulerMarkers(this.diagram, this.currentPosition);
-            let force: boolean = false; let target: NodeModel | PointPortModel;
+            let force: boolean = false; let target: NodeModel | PointPortModel | ShapeAnnotationModel | PathAnnotationModel;
             if (e.type === 'touchmove') {
                 touches = (<TouchEvent & PointerEvent>e).touches;
                 if (touches && touches.length > 1) {
@@ -380,9 +463,9 @@ export class DiagramEventHandler {
                     this.getMouseEventArgs(this.currentPosition, this.eventArgs);
                     this.tool = this.getTool(this.action);
                     this.mouseEvents();
-                    if (this.tool instanceof ConnectorDrawingTool) {
-                        this.tool.mouseMove(this.eventArgs);
-                    } else if (this.tool instanceof PolygonDrawingTool) {
+                    if (this.tool instanceof ConnectorDrawingTool ||
+                        this.tool instanceof PolyLineDrawingTool ||
+                        this.tool instanceof PolygonDrawingTool) {
                         this.tool.mouseMove(this.eventArgs);
                     } else if (touches && this.tool instanceof ZoomPanTool) {
                         this.tool.mouseDown(this.eventArgs);
@@ -410,20 +493,7 @@ export class DiagramEventHandler {
                         let info: Info = (e.ctrlKey && e.shiftKey) ? { ctrlKey: e.ctrlKey, shiftKey: e.shiftKey } : { ctrlKey: true };
                         this.eventArgs.info = info;
                     }
-                    if (canMove(obj) && canSelect(obj) && this.initialEventArgs &&
-                        this.initialEventArgs.source && this.action === 'Select') {
-                        if (!isSelected(this.diagram, this.eventArgs.source, false) &&
-                            this.eventArgs.source instanceof Selector) {
-                            this.getMouseEventArgs(this.currentPosition, this.eventArgs);
-                        }
-                        if (!(obj instanceof Connector) || (obj instanceof Connector &&
-                            !(contains(this.currentPosition, obj.sourcePoint, obj.hitPadding) ||
-                                contains(this.currentPosition, obj.targetPoint, obj.hitPadding)))) {
-                            this.action = 'Drag';
-                        }
-                        this.tool = this.getTool(this.action);
-                        this.tool.mouseDown(this.initialEventArgs);
-                    }
+                    this.checkAction(obj);
                     this.getMouseEventArgs(this.currentPosition, this.eventArgs, this.eventArgs.source);
                     this.updateCursor();
                     this.inAction = true;
@@ -465,12 +535,19 @@ export class DiagramEventHandler {
     public mouseUp(evt: PointerEvent): void {
         let touches: TouchList;
         touches = (<TouchEvent & PointerEvent>evt).touches;
+        if (this.isScrolling) {
+            this.isScrolling = false;
+            evt.preventDefault();
+            return;
+        }
         if (!this.checkEditBoxAsTarget(evt) && (canUserInteract(this.diagram))
             || (canZoomPan(this.diagram) && !defaultTool(this.diagram))) {
-            if (this.tool && (!(this.tool instanceof PolygonDrawingTool) ||
-                ((this.tool instanceof PolygonDrawingTool) && evt.detail === 2))) {
-                this.diagram.endEdit();
-                document.getElementById(this.diagram.element.id + 'content').focus();
+            if (this.tool && (!(this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool) ||
+                ((this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool)
+                    && evt.detail === 2))) {
+                if (!this.isForeignObject(evt.target as HTMLElement)) {
+                    document.getElementById(this.diagram.element.id + 'content').focus();
+                }
                 if (!this.inAction && evt.which !== 3) {
                     if (this.action === 'Drag') {
                         this.action = 'Select';
@@ -564,13 +641,15 @@ export class DiagramEventHandler {
         this.eventArgs = {};
         this.tool = null;
         removeRulerMarkers();
+        if (this.action === 'Rotate') {
+            this.diagram.diagramCanvas.classList.remove('e-diagram-rotate');
+        }
         evt.preventDefault();
     }
     /** @private */
     public mouseWheel(evt: WheelEvent): void {
         let up: boolean = (evt.wheelDelta > 0 || -40 * evt.detail > 0) ? true : false;
         let mousePosition: PointModel = this.getMousePosition(evt);
-        this.diagram.endEdit();
         this.diagram.tooltipObject.close();
         let ctrlKey: boolean = this.isMetaKey(evt);
         if (ctrlKey) {
@@ -580,7 +659,7 @@ export class DiagramEventHandler {
             let horizontalOffset: number = this.diagram.scroller.horizontalOffset;
             let verticalOffset: number = this.diagram.scroller.verticalOffset;
             let change: number = up ? 20 : -20;
-            if (this.tool && this.tool instanceof PolygonDrawingTool) {
+            if (this.tool && (this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool)) {
                 this.eventArgs = {};
                 this.getMouseEventArgs(mousePosition, this.eventArgs);
                 this.eventArgs.position = mousePosition;
@@ -595,6 +674,11 @@ export class DiagramEventHandler {
                 || verticalOffset !== this.diagram.scroller.verticalOffset) {
                 evt.preventDefault();
             }
+        }
+        if (this.diagram.textEditing) {
+            this.diagram.isTriggerEvent = true;
+            this.diagram.startTextEdit();
+            this.diagram.isTriggerEvent = false;
         }
     }
     /** @private */
@@ -648,14 +732,16 @@ export class DiagramEventHandler {
         let position: PointModel = this.getMousePosition(e);
         position.x *= this.diagram.scroller.currentZoom;
         position.y *= this.diagram.scroller.currentZoom;
+        let rulerSize: Size = getRulerSize(this.diagram);
         let movingPosition: string;
         let autoScrollBorder: MarginModel = this.diagram.scrollSettings.autoScrollBorder;
         if (this.diagram.scrollSettings.canAutoScroll) {
-            if (position.x + this.diagram.scroller.horizontalOffset + autoScrollBorder.right > this.diagram.scroller.viewPortWidth - 18) {
+            if (position.x + this.diagram.scroller.horizontalOffset + autoScrollBorder.right + rulerSize.width >=
+                this.diagram.scroller.viewPortWidth - 18) {
                 movingPosition = 'right';
             } else if (position.x + this.diagram.scroller.horizontalOffset < autoScrollBorder.left) {
                 movingPosition = 'left';
-            } else if (position.y + this.diagram.scroller.verticalOffset + autoScrollBorder.bottom >
+            } else if (position.y + this.diagram.scroller.verticalOffset + autoScrollBorder.bottom + rulerSize.height >
                 this.diagram.scroller.viewPortHeight - 18) {
                 movingPosition = 'bottom';
             } else if (position.y + this.diagram.scroller.verticalOffset < autoScrollBorder.top) {
@@ -670,34 +756,34 @@ export class DiagramEventHandler {
         if ((this.tool instanceof MoveTool || this.tool instanceof ResizeTool
             || this.tool instanceof SelectTool) && this.inAction) {
             let diagram: DiagramEventHandler = this;
-            this.eventArgs.position = { x: this.tool.prevPosition.x, y: this.tool.prevPosition.y };
             let pos: PointModel = this.getMousePosition(e);
             let autoScrollBorder: MarginModel = this.diagram.scrollSettings.autoScrollBorder;
             let newDelay: number = delay ? delay : 100;
             let left: number = 0; let top: number = 0;
+            let point: PointModel = { x: pos.x, y: pos.y };
             switch (position) {
                 case 'right':
-                    this.eventArgs.position.x += 10;
+                    point.x = pos.x + 10;
                     left = 10;
                     break;
                 case 'left':
-                    this.eventArgs.position.x -= 10;
+                    point.x = pos.x - 10;
                     left = -10;
                     break;
                 case 'bottom':
-                    this.eventArgs.position.y += 10;
+                    point.y = pos.y + 10;
                     top = 10;
                     break;
                 case 'top':
-                    this.eventArgs.position.y -= 10;
+                    point.y = pos.y - 10;
                     top = -10;
                     break;
             }
+            this.eventArgs.position = { x: point.x, y: point.y };
             this.tool.mouseMove(this.eventArgs);
             this.diagram.scroller.zoom(1, -left, -top, pos);
         }
     }
-
     private mouseEvents(): void {
         let target: (NodeModel | ConnectorModel)[] = this.diagram.findObjectsUnderMouse(this.currentPosition);
         for (let i: number = 0; i < target.length; i++) {
@@ -711,7 +797,7 @@ export class DiagramEventHandler {
             actualObject: this.eventArgs.actualObject
         };
         if (this.lastObjectUnderMouse && (!this.eventArgs.actualObject || (this.lastObjectUnderMouse !== this.eventArgs.actualObject))) {
-            arg.element = this.lastObjectUnderMouse; arg.targets = arg.actualObject = undefined;
+            let arg: IMouseEventArgs = { targets: undefined, element: this.lastObjectUnderMouse, actualObject: undefined };
             this.diagram.triggerEvent(DiagramEvent.mouseLeave, arg);
             this.lastObjectUnderMouse = null;
         }
@@ -780,11 +866,11 @@ export class DiagramEventHandler {
             if (obj !== null && canUserInteract(this.diagram)) {
                 let node: (NodeModel | ConnectorModel) = obj;
                 annotation = this.diagram.findElementUnderMouse(obj, this.currentPosition);
-                if (this.tool && this.tool instanceof PolygonDrawingTool) {
+                if (this.tool && (this.tool instanceof PolygonDrawingTool || this.tool instanceof PolyLineDrawingTool)) {
                     let arg: IDoubleClickEventArgs = {
                         source: obj || this.diagram, position: this.currentPosition, count: evt.detail
                     };
-                    this.tool.mouseUp(this.eventArgs, arg);
+                    this.tool.mouseUp(this.eventArgs);
                     this.isMouseDown = false;
                     this.eventArgs = {};
                     this.tool = null;
@@ -822,7 +908,7 @@ export class DiagramEventHandler {
         let node: NodeModel | ConnectorModel;
         let height: number; let width: number;
         let textBounds: Size; let textBoxWidth: number;
-        let transforms: TransformFactor;
+        let transforms: TransformFactor; let scale: number;
         let editTextBox: HTMLElement = document.getElementById(this.diagram.element.id + '_editBox');
         let editTextBoxDiv: HTMLElement = document.getElementById(this.diagram.element.id + '_editTextBoxDiv');
         let text: string = ((editTextBox as HTMLTextAreaElement).value);
@@ -835,17 +921,18 @@ export class DiagramEventHandler {
         if (node && ((node.shape.type !== 'Text' && node.annotations.length > 0) || (node.shape.type === 'Text'))) {
             textWrapper = this.diagram.getWrapper(node.wrapper, this.diagram.activeLabel.id);
 
-            maxWidth = node.wrapper.bounds.width > textWrapper.bounds.width ? node.wrapper.bounds.width : textWrapper.bounds.width;
+            maxWidth = node.wrapper.bounds.width < textWrapper.bounds.width ? node.wrapper.bounds.width : textWrapper.bounds.width;
             maxWidth = maxWidth > minWidth ? maxWidth : minWidth;
             textBounds = measureHtmlText(textWrapper.style, text, undefined, undefined, maxWidth);
             fontsize = Number((editTextBox.style.fontSize).split('px')[0]);
             if (line.length > 1 && line[line.length - 1] === '') {
                 textBounds.height = textBounds.height + fontsize;
             }
-            width = textBounds.width;
-            width = (minWidth > width) ? minWidth : width;
-            height = (minHeight > textBounds.height) ? minHeight : textBounds.height;
             transforms = this.diagram.scroller.transform;
+            scale = canZoomTextEdit(this.diagram) ? transforms.scale : 1;
+            width = textBounds.width;
+            width = ((minWidth > width) ? minWidth : width) * scale;
+            height = ((minHeight > textBounds.height) ? minHeight : textBounds.height) * scale;
             editTextBoxDiv.style.left = ((((textWrapper.bounds.center.x + transforms.tx) * transforms.scale) - width / 2) - 2.5) + 'px';
             editTextBoxDiv.style.top = ((((textWrapper.bounds.center.y + transforms.ty) * transforms.scale) - height / 2) - 3) + 'px';
             editTextBoxDiv.style.width = width + 'px';
@@ -867,7 +954,9 @@ export class DiagramEventHandler {
                 this.diagram.drawingObject = undefined;
                 this.diagram.currentDrawingObject = undefined;
             }
-            if (getObjectFromCollection(this.diagram.nodes, node.id) || getObjectFromCollection(this.diagram.connectors, node.id)) {
+            if (getObjectFromCollection(this.diagram.nodes, node.id) ||
+                getObjectFromCollection(this.diagram.connectors, node.id) ||
+                (this.diagram.bpmnModule && this.diagram.bpmnModule.textAnnotationConnectors.indexOf(node as Connector) > -1)) {
                 return false;
             }
             return true;
@@ -890,7 +979,7 @@ export class DiagramEventHandler {
         if (!source) {
             if (this.action === 'Drag' || this.action === 'ConnectorSourceEnd' || this.action === 'SegmentEnd' ||
                 this.action === 'OrthoThumb' || this.action === 'BezierSourceThumb' || this.action === 'BezierTargetThumb' ||
-                this.action === 'ConnectorTargetEnd' || this.action === 'Rotate' || this.action.indexOf('Resize') !== -1) {
+                this.action === 'ConnectorTargetEnd' || this.action.indexOf('Rotate') !== -1 || this.action.indexOf('Resize') !== -1) {
                 obj = this.diagram.selectedItems as IElement;
             } else {
                 objects = this.diagram.findObjectsUnderMouse(this.currentPosition);
@@ -967,6 +1056,9 @@ export class DiagramEventHandler {
                     (type === 'Node' && this.diagram.drawingObject.shape[shape] === 'Polygon' &&
                         ((this.diagram.drawingObject.shape as BasicShapeModel).points))) {
                     return new NodeDrawingTool(this.commandHandler, this.diagram.drawingObject as Node);
+                } else if (type === 'Connector' && (this.diagram.drawingObject as Connector).type === 'Polyline') {
+                    return new PolyLineDrawingTool(
+                        this.commandHandler);
                 } else if (type === 'Connector') {
                     return new ConnectorDrawingTool(
                         this.commandHandler, 'ConnectorSourceEnd', this.diagram.drawingObject as Connector);
@@ -981,6 +1073,21 @@ export class DiagramEventHandler {
             case 'PortDraw':
                 return new ConnectorDrawingTool(
                     this.commandHandler, 'ConnectorSourceEnd', this.diagram.drawingObject as Connector);
+            case 'LabelSelect':
+                return new SelectTool(this.commandHandler, true, 'LabelSelect');
+            case 'LabelDrag':
+                return new LabelDragTool(this.commandHandler);
+            case 'LabelResizeSouthEast':
+            case 'LabelResizeSouthWest':
+            case 'LabelResizeNorthEast':
+            case 'LabelResizeNorthWest':
+            case 'LabelResizeSouth':
+            case 'LabelResizeNorth':
+            case 'LabelResizeWest':
+            case 'LabelResizeEast':
+                return new LabelResizeTool(this.commandHandler, action);
+            case 'LabelRotate':
+                return new LabelRotateTool(this.commandHandler);
 
             //for coverage
             // case 'Custom':
@@ -990,7 +1097,11 @@ export class DiagramEventHandler {
     }
     /** @private */
     public getCursor(action: Actions): string {
-        return getCursor(action, this.diagram.selectedItems.rotateAngle);
+        let object: DiagramElement | SelectorModel = ((this.diagram.selectedItems as Selector).annotation) ?
+            this.diagram.selectedItems.wrapper.children[0] : this.diagram.selectedItems;
+        let rotateAngle: number = ((this.diagram.selectedItems as Selector).annotation) ?
+            (object.rotateAngle + (object as DiagramElement).parentTransform) : object.rotateAngle;
+        return getCursor(action, rotateAngle);
     }
 
     //start region - interface betweend diagram and interaction
@@ -1014,7 +1125,7 @@ export class DiagramEventHandler {
     /** @private */
     public findActionToBeDone(
         obj: NodeModel | ConnectorModel, wrapper: DiagramElement,
-        position: PointModel, target?: NodeModel | PointPortModel): Actions {
+        position: PointModel, target?: NodeModel | PointPortModel | ShapeAnnotationModel | PathAnnotationModel): Actions {
         return findToolToActivate(
             obj, wrapper, this.currentPosition, this.diagram, this.touchStartList, this.touchMoveList, target);
     }
@@ -1048,6 +1159,7 @@ class ObjectFinder {
         for (let obj of objArray) {
             let point: PointModel = pt;
             bounds = (obj as NodeModel).wrapper.outerBounds;
+            let pointInBounds: boolean = ((obj as NodeModel).rotateAngle) ? false : bounds.containsPoint(point);
             if ((obj !== source || diagram.currentDrawingObject instanceof Connector) &&
                 (obj instanceof Connector) ? obj !== diagram.currentDrawingObject : true && (obj as NodeModel).wrapper.visible) {
                 let layer: LayerModel = diagram.commandHandler.getObjectLayer((obj as NodeModel).id);
@@ -1055,25 +1167,27 @@ class ObjectFinder {
                     layerTarger = layerObjTable[layer.zIndex] = layerObjTable[layer.zIndex] || [];
                     if ((obj as NodeModel).rotateAngle) {
                         container = (obj as NodeModel).wrapper;
-                        matrix = identityMatrix();
-                        rotateMatrix(
-                            matrix, -(container.rotateAngle + container.parentTransform),
-                            (obj as NodeModel).offsetX, (obj as NodeModel).offsetY);
-                        point = transformPointByMatrix(matrix, pt);
-                        bounds = container.corners;
+                        bounds = cornersPointsBeforeRotation(container);
                         for (child of container.children) {
-                            bounds.uniteRect(child.corners);
+                            matrix = identityMatrix();
+                            rotateMatrix(
+                                matrix, -(child.rotateAngle + child.parentTransform),
+                                child.offsetX, child.offsetY);
+                            point = transformPointByMatrix(matrix, pt);
+                            if (cornersPointsBeforeRotation(child).containsPoint(point)) {
+                                pointInBounds = true;
+                            }
                         }
                     }
                     if (!source || (isSelected(diagram, obj) === false)) {
                         if (canEnablePointerEvents(obj, diagram)) {
-                            if ((obj instanceof Connector) ? isPointOverConnector(obj, pt) : bounds.containsPoint(point)) {
+                            if ((obj instanceof Connector) ? isPointOverConnector(obj, pt) : pointInBounds) {
                                 let padding: number = (obj instanceof Connector) ? obj.hitPadding || 0 : 0;
                                 let element: DiagramElement;
                                 element = this.findElementUnderMouse(obj as IElement, pt, padding);
                                 if (element) {
                                     if (obj instanceof Connector && diagram.bpmnModule) {
-                                        obj = diagram.bpmnModule.findInteractableObject(obj, diagram);
+                                        //    obj = diagram.bpmnModule.findInteractableObject(obj, diagram);
                                     }
                                     insertObject(obj, 'zIndex', layerTarger);
                                 }
@@ -1129,6 +1243,16 @@ class ObjectFinder {
         if (node && (!node.processId && !actualTarget.processId || node.processId !== actualTarget.processId)) {
             if (node.processId !== actualTarget.processId) {
                 actualTarget = null;
+            }
+        }
+        if (action === 'ConnectorSourceEnd' && connector.targetID) {
+            let targetNode: NodeModel = diagram.nameTable[connector.targetID];
+            if (targetNode && targetNode.shape && ((targetNode.shape as BpmnShapeModel).shape === 'TextAnnotation')) {
+                let id: string[] = connector.id.split('_');
+                if (((targetNode.shape.type === 'Bpmn') && actualTarget.shape.type !== 'Bpmn') || (id[0] === actualTarget.id) ||
+                    (actualTarget.shape as BpmnShapeModel).shape === 'TextAnnotation') {
+                    actualTarget = null;
+                }
             }
         }
         return actualTarget;

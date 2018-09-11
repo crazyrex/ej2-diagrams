@@ -1,4 +1,4 @@
-import { Component, Property, Complex, CollectionFactory, ChildProperty, Event } from '@syncfusion/ej2-base';import { Browser, EventHandler, Draggable, INotifyPropertyChanged, Collection, ModuleDeclaration } from '@syncfusion/ej2-base';import { remove, createElement, classList, EmitType } from '@syncfusion/ej2-base';import { Accordion, AccordionItemModel, ExpandMode, ExpandEventArgs } from '@syncfusion/ej2-navigations';import { NodeModel, ConnectorModel, Node, Connector, Shape, Size, Transform } from '../diagram/index';import { DiagramRenderer, Container, StackPanel, Margin, BpmnDiagrams } from '../diagram/index';import { DiagramElement, TextElement, MarginModel, Canvas, BpmnShape, PointModel, IElement } from '../diagram/index';import { TextWrap, TextOverflow, IPaletteSelectionChangeArgs } from '../diagram/index';import { SvgRenderer } from '../diagram/rendering/svg-renderer';import { parentsUntil, createSvgElement, createHtmlElement, createMeasureElements } from '../diagram/utility/dom-util';import { scaleElement } from '../diagram/utility/diagram-util';import { getFunction } from '../diagram/utility/base-util';import { getOuterBounds } from '../diagram/utility/connector';import { Point } from '../diagram/primitives/point';import { CanvasRenderer } from '../diagram/rendering/canvas-renderer';import { Rect } from '../diagram/primitives/rect';
+import { Component, Property, Complex, CollectionFactory, ChildProperty, Event } from '@syncfusion/ej2-base';import { Browser, EventHandler, Draggable, INotifyPropertyChanged, Collection, ModuleDeclaration } from '@syncfusion/ej2-base';import { remove, classList, EmitType } from '@syncfusion/ej2-base';import { Accordion, AccordionItemModel, ExpandMode, ExpandEventArgs } from '@syncfusion/ej2-navigations';import { NodeModel, ConnectorModel, Node, Connector, Shape, Size, Transform } from '../diagram/index';import { DiagramRenderer, Container, StackPanel, Margin, BpmnDiagrams } from '../diagram/index';import { DiagramElement, TextElement, MarginModel, Canvas, BpmnShape, PointModel, IElement } from '../diagram/index';import { TextWrap, TextOverflow, IPaletteSelectionChangeArgs } from '../diagram/index';import { SvgRenderer } from '../diagram/rendering/svg-renderer';import { parentsUntil, createSvgElement, createHtmlElement, createMeasureElements } from '../diagram/utility/dom-util';import { scaleElement, arrangeChild, groupHasType } from '../diagram/utility/diagram-util';import { getFunction } from '../diagram/utility/base-util';import { getOuterBounds } from '../diagram/utility/connector';import { Point } from '../diagram/primitives/point';import { CanvasRenderer } from '../diagram/rendering/canvas-renderer';import { Rect } from '../diagram/primitives/rect';
 import {ComponentModel} from '@syncfusion/ej2-base';
 
 /**
@@ -20,19 +20,19 @@ export interface PaletteModel {
     height?: number;
 
     /**
-     * Sets whether the symbol group is expanded or not
+     * Sets whether the palette items to be expanded or not
      * @default true
      */
     expanded?: boolean;
 
     /**
-     * Defines the content of the group icon
+     * Defines the content of the symbol group
      * @default ''
      */
     iconCss?: string;
 
     /**
-     * Defines the title of the group icon
+     * Defines the title of the symbol group
      * @default ''
      */
     title?: string;
@@ -102,9 +102,44 @@ export interface SymbolPaletteModel extends ComponentModel{
     palettes?: PaletteModel[];
 
     /**
-     * Defines the size, appearance and description of a symbol
-     * @aspDefaultValueIgnore
-     * @default undefined
+     * ```html
+     * <div id="symbolpalette"></div>
+     *  ```
+     * ```typescript
+     * let palette: SymbolPalette = new SymbolPalette({
+     *   expandMode: 'Multiple',
+     *   palettes: [
+     *       { id: 'flow', expanded: false, symbols: getFlowShapes(), title: 'Flow Shapes' },
+     *   ],
+     *   width: '100%', height: '100%', symbolHeight: 50, symbolWidth: 50,
+     *   symbolPreview: { height: 100, width: 100 },
+     *   enableSearch: true,
+     *   getNodeDefaults: setPaletteNodeDefaults,
+     *   symbolMargin: { left: 12, right: 12, top: 12, bottom: 12 },
+     *   getSymbolInfo: (symbol: NodeModel): SymbolInfo => {
+     *       return { fit: true };
+     *   }
+     * });
+     * palette.appendTo('#symbolpalette');
+     * export function getFlowShapes(): NodeModel[] {
+     *   let flowShapes: NodeModel[] = [
+     *       { id: 'Terminator', shape: { type: 'Flow', shape: 'Terminator' }, style: { strokeWidth: 2 } },
+     *       { id: 'Process', shape: { type: 'Flow', shape: 'Process' }, style: { strokeWidth: 2 } },
+     *       { id: 'Decision', shape: { type: 'Flow', shape: 'Decision' }, style: { strokeWidth: 2 } }
+     *   ];
+     *   return flowShapes;
+     * }
+     * function setPaletteNodeDefaults(node: NodeModel): void {
+     * if (node.id === 'Terminator' || node.id === 'Process') {
+     *   node.width = 130;
+     *   node.height = 65;
+     * } else {
+     *   node.width = 50;
+     *   node.height = 50;
+     * }
+     * node.style.strokeColor = '#3A3A3A';
+     * }
+     * ```
      */
     getSymbolInfo?: Function | string;
 
@@ -143,7 +178,7 @@ export interface SymbolPaletteModel extends ComponentModel{
     symbolMargin?: MarginModel;
 
     /**
-     * Enables/Disables dragging the symbols from palette
+     * Defines whether the symbols can be dragged from palette or not
      * @default true
      */
     allowDrag?: boolean;

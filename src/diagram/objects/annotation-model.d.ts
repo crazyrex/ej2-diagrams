@@ -6,7 +6,7 @@ import { Property, Complex, ChildProperty } from '@syncfusion/ej2-base';import {
 export interface HyperlinkModel {
 
     /**
-     * Sets the fill color of the link
+     * Sets the fill color of the hyperlink
      * @default 'blue'
      */
     color?: string;
@@ -25,6 +25,10 @@ export interface HyperlinkModel {
 
     /**
      * Defines how the link should be decorated. For example, with underline/over line
+     * * Overline - Decorates the text with a line above the text
+     * * Underline - Decorates the text with an underline
+     * * LineThrough - Decorates the text by striking it with a line
+     * * None - Text will not have any specific decoration
      * @default 'None'
      */
     textDecoration?: TextDecoration;
@@ -43,20 +47,41 @@ export interface AnnotationModel {
     content?: string;
 
     /**
-     * Defines the visibility for the label
+     * Defines the visibility of the label
      * @default true
      */
     visibility?: boolean;
 
     /**
-     * Defines the constraints for the label
+     * Enables or disables the default behaviors of the label.
+     * * ReadOnly - Enables/Disables the ReadOnly Constraints
+     * * InheritReadOnly - Enables/Disables the InheritReadOnly Constraints
      * @default 'InheritReadOnly'
      * @aspNumberEnum 
      */
     constraints?: AnnotationConstraints;
 
     /**
-     * Sets the hyperlink for the label
+     * Sets the hyperlink of the label
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let nodes: NodeModel[] = [{
+     * id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     * annotations: [{ id: 'label1',
+     * content: 'Default Shape', style: { color: 'red' },
+     * hyperlink: { link: 'https://www.google.com', color : 'blue', textDecoration : 'Overline', content : 'google' }
+     * }, {content: 'text', constraints: ~AnnotationConstraints.InheritReadOnly
+     * }],
+     * }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * nodes : nodes,
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @aspDefaultValueIgnore
      * @default undefined
      */
@@ -83,6 +108,12 @@ export interface AnnotationModel {
     height?: number;
 
     /**
+     * Sets the rotate angle of the text
+     * @default 0
+     */
+    rotateAngle?: number;
+
+    /**
      * Defines the appearance of the text
      * @default new TextStyle()
      */
@@ -90,12 +121,22 @@ export interface AnnotationModel {
 
     /**
      * Sets the horizontal alignment of the text with respect to the parent node/connector
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Left - Aligns the diagram element at the left of its immediate parent
+     * * Right - Aligns the diagram element at the right of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Center'
      */
     horizontalAlignment?: HorizontalAlignment;
 
     /**
      * Sets the vertical alignment of the text with respect to the parent node/connector
+     * * Stretch - Stretches the diagram element throughout its immediate parent
+     * * Top - Aligns the diagram element at the top of its immediate parent
+     * * Bottom - Aligns the diagram element at the bottom of its immediate parent
+     * * Center - Aligns the diagram element at the center of its immediate parent
+     * * Auto - Aligns the diagram element based on the characteristics of its immediate parent
      * @default 'Center'
      */
     verticalAlignment?: VerticalAlignment;
@@ -108,12 +149,32 @@ export interface AnnotationModel {
 
     /**
      * Sets the type of the annotation
+     *  * Shape - Sets the annotation type as Shape
+     *  * Path - Sets the annotation type as Path
      * @default 'Shape'
      */
     type?: AnnotationTypes;
 
     /**
      * Allows the user to save custom information/data about an annotation
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let addInfo: {}  = { content: 'label' };
+     * let nodes: NodeModel[] = [{
+     * id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100,
+     * annotations: [{ id: 'label1', 
+     * content: 'text', constraints: ~AnnotationConstraints.InheritReadOnly, addInfo: addInfo
+     * }],
+     * }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * nodes : nodes,
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @aspDefaultValueIgnore
      * @default undefined
      */
@@ -146,7 +207,7 @@ export interface PathAnnotationModel extends AnnotationModel{
     offset?: number;
 
     /**
-     * Sets the displacement from the label position
+     * Sets the displacement of an annotation from its actual position
      * @aspDefaultValueIgnore
      * @default undefined
      */
@@ -154,8 +215,17 @@ export interface PathAnnotationModel extends AnnotationModel{
 
     /**
      * Sets the segment alignment of annotation
+     *  * Center - Aligns the annotation at the center of a connector segment
+     *  * Before - Aligns the annotation before a connector segment
+     *  * After - Aligns the annotation after a connector segment
      * @default Center
      */
     alignment?: AnnotationAlignment;
+
+    /**
+     * Enable/Disable the angle based on the connector segment
+     * @default false
+     */
+    segmentAngle?: boolean;
 
 }

@@ -2,13 +2,15 @@ import { Point } from './../primitives/point';
 import { PointModel } from './../primitives/point-model';
 import { Connector } from '../objects/connector';
 import { Rect } from './../primitives/rect';
-import { DiagramElement } from './../core/elements/diagram-element';
+import { DiagramElement, Corners } from './../core/elements/diagram-element';
 import { getPoints, intersect3 } from './diagram-util';
 import { NoOfSegments, Direction, LayoutOrientation } from '../enum/enum';
 import { MarginModel } from '../core/appearance-model';
 import { OrthogonalSegmentModel, StraightSegmentModel, BezierSegmentModel } from './../objects/connector-model';
 import { StraightSegment, BezierSegment, OrthogonalSegment } from './../objects/connector';
 import { PathElement } from './../core/elements/path-element';
+import { cornersPointsBeforeRotation, rotatePoint } from './base-util';
+import { Segment } from '../interaction/scroller';
 
 /**
  * Connector modules are used to dock and update the connectors
@@ -34,7 +36,7 @@ function getSourcePoint(element: Connector): PointModel {
         let srcPort: DiagramElement = element.sourcePortWrapper;
         let srcNode: DiagramElement = element.sourceWrapper;
         let pt: PointModel = { x: srcPort.offsetX, y: srcPort.offsetY };
-        let direction: string = getPortDirection(pt, srcNode.corners, srcNode.bounds, false);
+        let direction: string = getPortDirection(pt, cornersPointsBeforeRotation(srcNode), srcNode.bounds, false);
         srcPoint = pt;
     } else if (element.sourceID && element.sourceWrapper) {
         if (element.targetWrapper) {
@@ -78,51 +80,59 @@ function terminateConnection(
     let tarCorner: Rect;
     let intermeditatePoints: PointModel[] = []; let segPoint: PointModel;
     let srcDir: Direction;
-    let tarDir: Direction;
+    let tarDir: Direction; let minSpace: number = 13;
     let sourceMargin: MarginModel = { left: 5, right: 5, bottom: 5, top: 5 };
     let targetMargin: MarginModel = { left: 5, right: 5, bottom: 5, top: 5 };
     let source: End = { corners: srcCorner, point: srcPoint, direction: srcDir, margin: sourceMargin };
     let target: End = { corners: tarCorner, point: tarPoint, direction: tarDir, margin: targetMargin };
+    let sourceCorners: Rect;
+    let targetCorners: Rect;
     if (sourceNode !== undefined && targetNode !== undefined) {
+        sourceCorners = cornersPointsBeforeRotation(sourceNode);
+        targetCorners = cornersPointsBeforeRotation(targetNode);
         source.corners = sourceNode.corners;
         target.corners = targetNode.corners;
     }
     if (sourcePort !== undefined) {
         let port: PointModel = { x: sourcePort.offsetX, y: sourcePort.offsetY };
-        source.direction = getPortDirection(port, source.corners, sourceNode.bounds, false);
+        source.direction = getPortDirection(port, sourceCorners, sourceNode.bounds, false);
     }
     if (targetPort !== undefined) {
         let tarPortPt: PointModel = { x: targetPort.offsetX, y: targetPort.offsetY };
-        target.direction = getPortDirection(tarPortPt, target.corners, targetNode.bounds, false);
+        target.direction = getPortDirection(tarPortPt, targetCorners, targetNode.bounds, false);
     }
     if (sourceNode !== undefined && targetNode !== undefined) {
         if (source.direction === undefined || target.direction === undefined) {
             if (layoutOrientation) {
                 getDirection(source, target, layoutOrientation);
             } else {
-                if (source.corners.topCenter.y > target.corners.bottomCenter.y &&
-                    Math.abs(source.corners.topCenter.y - target.corners.bottomCenter.y) >
+                if (source.corners.top > target.corners.bottom &&
+                    Math.abs(source.corners.top - target.corners.bottom) >
                     (source.margin.top + source.margin.bottom)) {
                     source.direction = source.direction ? source.direction : 'Top';
                     target.direction = target.direction ? target.direction : 'Bottom';
-                } else if (source.corners.bottomCenter.y < target.corners.topCenter.y &&
-                    Math.abs(source.corners.bottomCenter.y - target.corners.topCenter.y) >
+                } else if (source.corners.bottom < target.corners.top &&
+                    Math.abs(source.corners.bottom - target.corners.top) >
                     (source.margin.bottom + source.margin.top)) {
                     source.direction = source.direction ? source.direction : 'Bottom';
                     target.direction = target.direction ? target.direction : 'Top';
-                } else if (source.corners.middleRight.x < target.corners.middleLeft.x &&
-                    Math.abs(source.corners.middleRight.x - target.corners.middleLeft.x) >
-                    (source.margin.right + source.margin.left)) {
+                } else if ((source.corners.right < target.corners.left &&
+                    Math.abs(source.corners.right - target.corners.left) >
+                    (source.margin.right + source.margin.left)) ||
+                    ((source.corners.right + minSpace < target.corners.left) ||
+                        (target.corners.right >= source.corners.left - minSpace && source.corners.left > target.corners.left))) {
                     source.direction = source.direction ? source.direction : 'Right';
                     target.direction = target.direction ? target.direction : 'Left';
-                } else if (source.corners.middleLeft.x > target.corners.middleRight.x &&
-                    Math.abs(source.corners.middleLeft.x - target.corners.middleRight.x) >
-                    (source.margin.left + source.margin.right)) {
+                } else if ((source.corners.left > target.corners.right &&
+                    Math.abs(source.corners.left - target.corners.right) > (source.margin.left + source.margin.right)) ||
+                    ((target.corners.right + minSpace < source.corners.left ||
+                        (source.corners.right >= target.corners.left - minSpace
+                            && source.corners.left < target.corners.left)))) {
                     source.direction = source.direction ? source.direction : 'Left';
                     target.direction = target.direction ? target.direction : 'Right';
                 } else {
-                    if (sourceNode.id !== targetNode.id && (!source.corners.equals(source.corners, target.corners)) &&
-                        target.corners.containsPoint(source.corners.topCenter, source.margin.top)) {
+                    if (sourceNode.id !== targetNode.id && (!sourceCorners.equals(sourceCorners, targetCorners)) &&
+                        targetCorners.containsPoint(sourceCorners.topCenter, source.margin.top)) {
                         source.direction = source.direction ? source.direction : 'Bottom';
                         target.direction = target.direction ? target.direction : 'Top';
                     } else {
@@ -147,12 +157,16 @@ function terminateConnection(
             (element.segments[0] as OrthogonalSegment).direction !== null) {
             intermeditatePoints = findPointToPointOrtho(element, source, target, sourceNode, targetNode, sourcePort, targetPort);
         } else {
+            let extra: number;
             if (!source.direction) {
                 source.direction = (target.direction) ? (
                     (element.targetPortWrapper !== undefined) ? target.direction : getOppositeDirection(target.direction) as Direction) :
                     Point.direction(source.point, target.point) as Direction;
+            } else {
+                extra = adjustSegmentLength(sourceNode.bounds, source, 20);
             }
-            (element.segments[0] as OrthogonalSegment).points = intermeditatePoints = orthoConnection3Segment(element, source, target);
+            (element.segments[0] as OrthogonalSegment).points = intermeditatePoints = orthoConnection3Segment(
+                element, source, target, extra);
         }
     }
     return intermeditatePoints;
@@ -175,39 +189,39 @@ function pointToPoint(element: Connector, source: End, target: End): PointModel[
     source.corners = (element.sourceWrapper) ? element.sourceWrapper.corners : undefined;
     if (element.sourcePortWrapper) {
         let port: PointModel = { x: element.sourcePortWrapper.offsetX, y: element.sourcePortWrapper.offsetY };
-        portdirection = getPortDirection(port, source.corners, element.sourceWrapper.bounds, false);
+        portdirection = getPortDirection(port, cornersPointsBeforeRotation(element.sourceWrapper), element.sourceWrapper.bounds, false);
         if (source.corners && (source.direction === 'Bottom' || source.direction === 'Top')) {
-            if (target.point.x > source.corners.middleLeft.x && target.point.x < source.corners.middleRight.x) {
+            if (target.point.x > source.corners.left && target.point.x < source.corners.right) {
                 direction = (source.point.y > target.point.y) ? 'Top' : 'Bottom';
             }
         } else if (source.corners && (source.direction === 'Left' || source.direction === 'Right')) {
-            if (target.point.y > source.corners.topCenter.y && target.point.y < source.corners.bottomCenter.y) {
+            if (target.point.y > source.corners.top && target.point.y < source.corners.bottom) {
                 direction = (source.point.x > target.point.x) ? 'Left' : 'Right';
             }
         }
     }
     if (element.sourcePortWrapper && portdirection === getOppositeDirection(direction)) {
         let length: number;
-        if ((portdirection === 'Left' || portdirection === 'Right') && (source.point.y >= source.corners.topCenter.y
+        if ((portdirection === 'Left' || portdirection === 'Right') && (source.point.y >= source.corners.top
             && source.point.y <= source.corners.center.y) &&
-            (target.point.y >= source.corners.topCenter.y && target.point.y <= source.corners.center.y)) {
+            (target.point.y >= source.corners.top && target.point.y <= source.corners.center.y)) {
             source.direction = 'Top';
-            length = source.point.y - source.corners.topCenter.y + 20;
+            length = source.point.y - source.corners.top + 20;
         } else if ((portdirection === 'Left' || portdirection === 'Right') && (source.point.y > source.corners.center.y
-            && source.point.y <= source.corners.bottomCenter.y) &&
-            (target.point.y > source.corners.center.y && target.point.y <= source.corners.bottomCenter.y)) {
+            && source.point.y <= source.corners.bottom) &&
+            (target.point.y > source.corners.center.y && target.point.y <= source.corners.bottom)) {
             source.direction = 'Bottom';
-            length = source.corners.bottomCenter.y - source.point.y + 20;
-        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x >= source.corners.middleLeft.x
+            length = source.corners.bottom - source.point.y + 20;
+        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x >= source.corners.left
             && source.point.x <= source.corners.center.x) &&
-            (target.point.x >= source.corners.middleLeft.x && target.point.x <= source.corners.center.x)) {
+            (target.point.x >= source.corners.left && target.point.x <= source.corners.center.x)) {
             source.direction = 'Left';
-            length = source.point.x - source.corners.middleLeft.x + 20;
-        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x <= source.corners.middleRight.x
+            length = source.point.x - source.corners.left + 20;
+        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x <= source.corners.right
             && source.point.x > source.corners.center.x) &&
-            (target.point.x <= source.corners.middleRight.x && target.point.x < source.corners.center.x)) {
+            (target.point.x <= source.corners.right && target.point.x < source.corners.center.x)) {
             source.direction = 'Right';
-            length = source.corners.middleRight.x - source.point.x + 20;
+            length = source.corners.right - source.point.x + 20;
         }
         if (source.direction && length) {
             point = orthoConnection3Segment(element, source, target, length, true);
@@ -242,45 +256,45 @@ function addPoints(element: Connector, source: End, target: End): PointModel[] {
     let direction: Direction; let length: number;
     if (source.direction !== 'Left' && source.direction !== 'Right') {
         if (target.corners.center.y === source.point.y &&
-            (!(target.corners.middleLeft.x <= source.point.x && source.point.x <= target.corners.middleRight.x))) {
+            (!(target.corners.left <= source.point.x && source.point.x <= target.corners.right))) {
             direction = 'Top';
             length = target.corners.height / 2 + 20;
         } else if ((target.corners.center.y === source.point.y &&
             (element.segments[element.segments.length - 2] as OrthogonalSegment).direction === 'Bottom') ||
-            (target.corners.center.y > source.point.y && source.point.y >= target.corners.topCenter.y)) {
+            (target.corners.center.y > source.point.y && source.point.y >= target.corners.top)) {
             direction = 'Top';
-            length = (source.point.y - target.corners.topCenter.y) + 20;
+            length = (source.point.y - target.corners.top) + 20;
         } else if ((target.corners.center.y === source.point.y &&
             (element.segments[element.segments.length - 2] as OrthogonalSegment).direction === 'Top') ||
-            (target.corners.center.y < source.point.y && source.point.y <= target.corners.bottomCenter.y)) {
+            (target.corners.center.y < source.point.y && source.point.y <= target.corners.bottom)) {
             direction = 'Bottom';
-            length = (target.corners.bottomCenter.y - source.point.y) + 20;
+            length = (target.corners.bottom - source.point.y) + 20;
         } else if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined &&
-            source.corners.topCenter.y <= source.point.y && source.point.y <= source.corners.bottomCenter.y) {
+            source.corners.top <= source.point.y && source.point.y <= source.corners.bottom) {
             direction = source.direction;
-            length = (source.point.y > target.point.y) ? (source.point.y - source.corners.topCenter.y + 20) :
-                (source.corners.bottomCenter.y - source.point.y + 20);
+            length = (source.point.y > target.point.y) ? (source.point.y - source.corners.top + 20) :
+                (source.corners.bottom - source.point.y + 20);
         }
     } else {
         if (target.corners.center.x === source.point.x &&
-            (!(target.corners.topCenter.y < source.point.y && source.point.y <= target.corners.bottomCenter.y))) {
+            (!(target.corners.top < source.point.y && source.point.y <= target.corners.bottom))) {
             direction = 'Left';
             length = target.corners.width / 2 + 20;
         } else if ((target.corners.center.x === source.point.x &&
             (element.segments[element.segments.length - 2] as OrthogonalSegment).direction === 'Right')
-            || (target.corners.center.x > source.point.x && source.point.x >= target.corners.middleLeft.x)) {
+            || (target.corners.center.x > source.point.x && source.point.x >= target.corners.left)) {
             direction = 'Left';
-            length = (source.point.x - target.corners.middleLeft.x) + 20;
+            length = (source.point.x - target.corners.left) + 20;
         } else if ((target.corners.center.x === source.point.x &&
             (element.segments[element.segments.length - 2] as OrthogonalSegment).direction === 'Left') ||
-            (target.corners.center.x <= source.point.x && source.point.x <= target.corners.middleRight.x)) {
+            (target.corners.center.x <= source.point.x && source.point.x <= target.corners.right)) {
             direction = 'Right';
-            length = (target.corners.middleRight.x - source.point.x) + 20;
+            length = (target.corners.right - source.point.x) + 20;
         } else if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined &&
-            source.corners.middleLeft.x <= source.point.x && source.point.x <= source.corners.middleRight.x) {
+            source.corners.left <= source.point.x && source.point.x <= source.corners.right) {
             direction = source.direction;
-            length = (source.point.x > target.point.x) ? (source.point.x - source.corners.middleLeft.x + 20) :
-                (source.corners.middleRight.x - source.point.x + 20);
+            length = (source.point.x > target.point.x) ? (source.point.x - source.corners.left + 20) :
+                (source.corners.right - source.point.x + 20);
         }
     }
     let extra: number = (direction === 'Left' || direction === 'Top') ? -(length) : length;
@@ -301,25 +315,25 @@ function findSegmentDirection(element: Connector, source: End, target: End, port
     let update: boolean = false;
     switch (target.direction) {
         case 'Left': if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined && (portDir === 'Right' &&
-            source.point.x > target.point.x && source.point.y >= source.corners.topCenter.y &&
-            source.point.y <= source.corners.bottomCenter.y)
+            source.point.x > target.point.x && source.point.y >= source.corners.top &&
+            source.point.y <= source.corners.bottom)
             || (((portDir === 'Bottom' && source.point.y > target.point.y) ||
                 (portDir === 'Top' && source.point.y < target.point.y)) &&
-                source.point.x >= source.corners.middleLeft.x && source.point.x <= source.corners.middleRight.x)) {
+                source.point.x >= source.corners.left && source.point.x <= source.corners.right)) {
             source.direction = (portDir === 'Right') ? ((source.point.y > target.point.y) ? 'Top' : 'Bottom') :
                 (source.point.x < target.point.x ? 'Right' : 'Left');
             update = true;
         } else
             if (source.point.x > target.point.x && (source.point.y > target.point.y || source.point.y < target.point.y)
-                && (!(target.corners.topCenter.y > source.point.y && target.corners.bottomCenter.y < source.point.y))) {
+                && (!(target.corners.top > source.point.y && target.corners.bottom < source.point.y))) {
                 source.direction = 'Left';
             } else if ((source.point.x < target.point.x && source.point.y > target.point.y) ||
                 (source.point.x > target.point.x && (source.point.y <= target.point.y)
-                    && ((target.corners.topCenter.y < source.point.y && target.corners.center.y >= source.point.y)))) {
+                    && ((target.corners.top < source.point.y && target.corners.center.y >= source.point.y)))) {
                 source.direction = 'Top';
             } else if ((source.point.x < target.point.x && source.point.y < target.point.y) ||
                 (source.point.x > target.point.x && (source.point.y > target.point.y)
-                    && ((target.corners.bottomCenter.y < source.point.y && target.corners.center.y > source.point.y)))) {
+                    && ((target.corners.bottom < source.point.y && target.corners.center.y > source.point.y)))) {
                 source.direction = 'Bottom';
             } else if (source.point.y === target.point.y && source.point.x < target.point.x) {
                 source.direction = 'Right';
@@ -327,16 +341,16 @@ function findSegmentDirection(element: Connector, source: End, target: End, port
         case 'Right': if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined &&
             ((portDir === 'Bottom' && source.point.y > target.point.y) ||
                 (portDir === 'Top' && source.point.y < target.point.y)) && source.point.x > target.point.x &&
-            (source.point.x >= source.corners.middleLeft.x && source.point.x <= source.corners.middleRight.x)) {
+            (source.point.x >= source.corners.left && source.point.x <= source.corners.right)) {
             source.direction = (source.point.x > target.point.x) ? 'Left' : 'Right';
             update = true;
         } else if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined &&
-            portDir === 'Left' && source.point.x < target.point.x && (source.point.y >= source.corners.topCenter.y &&
-                source.point.y <= source.corners.bottomCenter.y)) {
+            portDir === 'Left' && source.point.x < target.point.x && (source.point.y >= source.corners.top &&
+                source.point.y <= source.corners.bottom)) {
             source.direction = (source.point.y > target.point.y) ? 'Top' : 'Bottom';
             update = true;
-        } else if (source.point.x < target.point.x && target.corners.topCenter.y <= source.point.y
-            && target.corners.bottomCenter.y >= source.point.y && source.point.y === target.point.y) {
+        } else if (source.point.x < target.point.x && target.corners.top <= source.point.y
+            && target.corners.bottom >= source.point.y && source.point.y === target.point.y) {
             source.direction = 'Top';
         } else if (source.point.y > target.point.y && source.point.x > target.point.x) {
             source.direction = 'Top';
@@ -349,17 +363,17 @@ function findSegmentDirection(element: Connector, source: End, target: End, port
             source.direction = 'Left';
         } break;
         case 'Top': if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined && (portDir === 'Bottom' &&
-            source.point.y > target.point.y && source.point.x >= source.corners.middleLeft.x &&
-            source.point.x <= source.corners.middleRight.x) || (((portDir === 'Right' && source.point.x > target.point.x) ||
+            source.point.y > target.point.y && source.point.x >= source.corners.left &&
+            source.point.x <= source.corners.right) || (((portDir === 'Right' && source.point.x > target.point.x) ||
                 (portDir === 'Left' && target.point.y > source.point.y && target.point.x > source.point.x)) &&
-                (source.point.y >= source.corners.topCenter.y && source.point.y <= source.corners.bottomCenter.y))) {
+                (source.point.y >= source.corners.top && source.point.y <= source.corners.bottom))) {
             source.direction = (portDir === 'Bottom') ? ((source.point.x > target.point.x) ? 'Left' : 'Right') :
                 (source.point.y < target.point.y) ? 'Bottom' : 'Top';
             update = true;
         } else if (source.point.x === target.point.x && source.point.y < target.point.y) {
             source.direction = 'Bottom';
-        } else if (source.point.y > target.point.y && source.point.x > target.corners.middleLeft.x &&
-            source.point.x < target.corners.middleRight.x) {
+        } else if (source.point.y > target.point.y && source.point.x > target.corners.left &&
+            source.point.x < target.corners.right) {
             source.direction = 'Left';
         } else if (source.point.y >= target.point.y) {
             source.direction = 'Top';
@@ -370,21 +384,21 @@ function findSegmentDirection(element: Connector, source: End, target: End, port
         } break;
         case 'Bottom': if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined && ((((portDir === 'Right') ||
             (portDir === 'Left' && target.point.x > source.point.x)) && (source.point.y > target.point.y) &&
-            source.point.y >= source.corners.topCenter.y && source.point.y <= source.corners.bottomCenter.y) ||
+            source.point.y >= source.corners.top && source.point.y <= source.corners.bottom) ||
             (((portDir === 'Top' && source.point.y < target.point.y)) &&
-                (source.point.x >= source.corners.middleLeft.x && source.point.x <= source.corners.middleRight.x)))) {
+                (source.point.x >= source.corners.left && source.point.x <= source.corners.right)))) {
             if (portDir === 'Right' || portDir === 'Left') {
                 source.direction = (source.point.y > target.point.y) ? 'Top' : 'Bottom';
             } else {
                 source.direction = (source.point.x > target.point.x) ? 'Left' : 'Right';
             }
             update = true;
-        } else if (source.point.y < target.point.y && source.point.x > target.corners.middleLeft.x &&
-            target.corners.middleRight.x > source.point.x) {
-            if (source.point.y < target.point.y && source.point.x > target.corners.middleLeft.x &&
+        } else if (source.point.y < target.point.y && source.point.x > target.corners.left &&
+            target.corners.right > source.point.x) {
+            if (source.point.y < target.point.y && source.point.x > target.corners.left &&
                 target.corners.center.x >= source.point.x) {
                 source.direction = 'Left';
-            } else if (source.point.y < target.point.y && source.point.x < target.corners.middleRight.x &&
+            } else if (source.point.y < target.point.y && source.point.x < target.corners.right &&
                 target.corners.center.x < source.point.x) {
                 source.direction = 'Right';
             }
@@ -403,15 +417,15 @@ function pointToPort(element: Connector, source: End, target: End): PointModel[]
     let point: PointModel[]; target.corners = element.targetWrapper.corners; let portdirection: Direction; let length: number;
     if (element.sourcePortWrapper !== undefined) {
         let port: PointModel = { x: element.sourcePortWrapper.offsetX, y: element.sourcePortWrapper.offsetY };
-        portdirection = getPortDirection(port, source.corners, element.sourceWrapper.bounds, false);
+        portdirection = getPortDirection(port, cornersPointsBeforeRotation(element.sourceWrapper), element.sourceWrapper.bounds, false);
     }
     let update: boolean = findSegmentDirection(element, source, target, portdirection);
     if (element.sourcePortWrapper !== undefined && element.targetPortWrapper !== undefined &&
         target.direction === getOppositeDirection(portdirection) &&
         ((((target.direction === 'Left' && source.point.x > target.point.x) || (target.direction === 'Right' &&
-            source.point.x < target.point.x)) && source.point.y >= source.corners.topCenter.y &&
-            source.point.y <= source.corners.bottomCenter.y) || (target.direction === 'Bottom' && source.point.y < target.point.y &&
-                (source.point.x >= source.corners.middleLeft.x && source.point.x <= source.corners.middleRight.x)))) {
+            source.point.x < target.point.x)) && source.point.y >= source.corners.top &&
+            source.point.y <= source.corners.bottom) || (target.direction === 'Bottom' && source.point.y < target.point.y &&
+                (source.point.x >= source.corners.left && source.point.x <= source.corners.right)))) {
 
         point = addPoints(element, source, target);
 
@@ -420,36 +434,36 @@ function pointToPort(element: Connector, source: End, target: End): PointModel[]
     } else if ((((target.direction === 'Left' && source.point.x > target.point.x) ||
         (target.direction === 'Right' && source.point.x < target.point.x)) && (source.direction === 'Top' || source.direction === 'Bottom')
         && ((source.point.y <= target.point.y) &&
-            ((target.corners.topCenter.y <= source.point.y && target.corners.bottomCenter.y >= source.point.y)))) ||
+            ((target.corners.top <= source.point.y && target.corners.bottom >= source.point.y)))) ||
         ((target.direction === 'Top' && source.point.y > target.point.y) ||
             (target.direction === 'Bottom' && source.point.y < target.point.y) &&
-            ((target.corners.middleLeft.x <= source.point.x && target.corners.middleRight.x >= source.point.x)))) {
+            ((target.corners.left <= source.point.x && target.corners.right >= source.point.x)))) {
         point = addPoints(element, source, target);
     } else {
         if (element.sourceWrapper !== undefined && element.targetWrapper !== undefined && element.targetPortWrapper !== undefined &&
             ((source.direction === 'Left' || source.direction === 'Right') &&
-                (source.point.y >= source.corners.topCenter.y && source.point.y <= source.corners.bottomCenter.y)
+                (source.point.y >= source.corners.top && source.point.y <= source.corners.bottom)
                 && (target.direction === 'Top' || target.direction === 'Bottom') &&
                 (target.corners.center.x === source.corners.center.x))) {
             source.direction = (target.direction === 'Top') ? 'Bottom' : 'Top';
-            length = (target.direction === 'Top') ? (source.corners.bottomCenter.y - source.point.y + 20) :
-                (source.point.y - source.corners.topCenter.y + 20);
+            length = (target.direction === 'Top') ? (source.corners.bottom - source.point.y + 20) :
+                (source.point.y - source.corners.top + 20);
             point = orthoConnection3Segment(element, source, target, length);
         } else if (element.sourceWrapper !== undefined && element.targetWrapper !== undefined && element.targetPortWrapper !== undefined &&
             ((source.direction === 'Top' || source.direction === 'Bottom') &&
-                (source.point.x >= source.corners.middleLeft.x && source.point.x <= source.corners.middleRight.x) &&
+                (source.point.x >= source.corners.left && source.point.x <= source.corners.right) &&
                 (target.direction === 'Left' || target.direction === 'Right') && (target.corners.center.y === source.corners.center.y))) {
             source.direction = (target.direction === 'Left') ? 'Right' : 'Left';
-            length = (target.direction === 'Left') ? (source.corners.middleRight.x - source.point.x + 20) :
-                (source.point.x - source.corners.middleLeft.x + 20);
+            length = (target.direction === 'Left') ? (source.corners.right - source.point.x + 20) :
+                (source.point.x - source.corners.left + 20);
             point = orthoConnection3Segment(element, source, target, length);
         } else if (update) {
             if (source.direction === 'Left' || source.direction === 'Right') {
-                length = (source.direction === 'Left') ? (source.point.x - source.corners.middleLeft.x + 20) :
-                    (source.corners.middleRight.x - source.point.x + 20);
+                length = (source.direction === 'Left') ? (source.point.x - source.corners.left + 20) :
+                    (source.corners.right - source.point.x + 20);
             } else {
-                length = (source.direction === 'Top') ? (source.point.y - source.corners.topCenter.y + 20) :
-                    (source.corners.bottomCenter.y - source.point.y + 20);
+                length = (source.direction === 'Top') ? (source.point.y - source.corners.top + 20) :
+                    (source.corners.bottom - source.point.y + 20);
             }
             point = orthoConnection3Segment(element, source, target, length);
         } else {
@@ -470,7 +484,7 @@ function findPointToPointOrtho(
             let seg: OrthogonalSegment = (element.segments[i] as OrthogonalSegment);
             if (i === 0 && element.sourcePortWrapper !== undefined) {
                 port = { x: sourcePort.offsetX, y: sourcePort.offsetY };
-                direction = getPortDirection(port, sourceNode.corners, sourceNode.bounds, false) as Direction;
+                direction = getPortDirection(port, cornersPointsBeforeRotation(sourceNode), sourceNode.bounds, false) as Direction;
                 if (seg.direction === getOppositeDirection(direction)) {
                     seg.direction = direction;
                 }
@@ -522,11 +536,11 @@ function findPointToPointOrtho(
 
 function checkPortdirection(element: Connector, sourcePort: DiagramElement, sourceNode: DiagramElement): PointModel {
     let port: PointModel = { x: sourcePort.offsetX, y: sourcePort.offsetY };
-    let point: PointModel;
-    let direction: Direction = getPortDirection(port, sourceNode.corners, sourceNode.bounds, false);
+    let point: PointModel; let bounds: Rect = cornersPointsBeforeRotation(sourceNode);
+    let direction: Direction = getPortDirection(port, bounds, sourceNode.bounds, false);
     let seg: OrthogonalSegment = (element.segments[0] as OrthogonalSegment);
     if (seg.direction !== direction) {
-        pointsFromNodeToPoint(seg, direction, sourceNode.corners, seg.points[0], seg.points[seg.points.length - 1], false);
+        pointsFromNodeToPoint(seg, direction, bounds, seg.points[0], seg.points[seg.points.length - 1], false);
         point = seg.points[seg.points.length - 1];
         seg.direction = Point.direction(seg.points[seg.points.length - 2], seg.points[seg.points.length - 1]) as Direction;
     }
@@ -584,7 +598,7 @@ function connectToOneEnd(element: Connector, source: End, target: End): void {
             (element.segments[0] as OrthogonalSegment).direction) {
             source.direction = (element.segments[0] as OrthogonalSegment).direction;
             nodeConnectingPoint = findPoint(node.corners, source.direction);
-            refPoint = findEndPoint(source.direction, nodeConnectingPoint, node);
+            refPoint = findPoint(node.corners, getOppositeDirection(source.direction));
             nodeConnectingPoint = getIntersection(element, node, nodeConnectingPoint, refPoint, false);
         } else {
             let source: End = { corners: null, direction: null, point: fixedPoint, margin: nodeMargin };
@@ -647,19 +661,61 @@ function createSegmentsCollection(sourceWrapper: DiagramElement): Segment[] {
 }
 
 function createLineSegment(sPt: PointModel, tPt: PointModel): Segment {
-    let line: Segment = { X1: sPt.x, Y1: sPt.y, X2: tPt.x, Y2: tPt.y };
+    let line: Segment = { x1: sPt.x, y1: sPt.y, x2: tPt.x, y2: tPt.y };
     return line;
 }
- /* tslint:disable */
+
+/** @private */
+export function swapBounds(object: DiagramElement, bounds: Corners, outerBounds: Rect): Corners {
+    let rectBounds: Corners;
+    let rotateAngle: number = object.rotateAngle + object.parentTransform;
+    if (rotateAngle) {
+        if (rotateAngle < 45) {
+            return bounds;
+        } else if (rotateAngle <= 135) {
+            rectBounds = {
+                width: bounds.width, height: bounds.height,
+                topLeft: bounds.bottomLeft, topCenter: bounds.middleLeft, topRight: bounds.topLeft,
+                middleLeft: bounds.bottomCenter, center: outerBounds.center, middleRight: bounds.topCenter,
+                bottomLeft: bounds.bottomRight, bottomCenter: bounds.middleRight, bottomRight: bounds.topRight,
+                left: outerBounds.left, right: outerBounds.right, top: outerBounds.top, bottom: outerBounds.bottom
+            };
+        } else if (rotateAngle <= 225) {
+            rectBounds = {
+                width: bounds.width, height: bounds.height,
+                topLeft: bounds.bottomLeft, topCenter: bounds.bottomCenter, topRight: bounds.bottomRight,
+                middleLeft: bounds.middleRight, center: outerBounds.center, middleRight: bounds.middleLeft,
+                bottomLeft: bounds.topLeft, bottomCenter: bounds.topCenter, bottomRight: bounds.topRight,
+                left: outerBounds.left, right: outerBounds.right, top: outerBounds.top,
+                bottom: outerBounds.bottom
+            };
+        } else if (rotateAngle <= 315) {
+            rectBounds = {
+                width: bounds.width, height: bounds.height,
+                topLeft: bounds.topRight, topCenter: bounds.middleRight, topRight: bounds.bottomRight,
+                middleLeft: bounds.topCenter, center: outerBounds.center, middleRight: bounds.bottomCenter,
+                bottomLeft: bounds.topLeft, bottomCenter: bounds.middleLeft, bottomRight: bounds.bottomLeft,
+                left: outerBounds.left, right: outerBounds.right, top: outerBounds.top, bottom: outerBounds.bottom
+            };
+        } else {
+            return bounds;
+        }
+        return rectBounds;
+    }
+    return bounds;
+}
+/* tslint:disable */
 function defaultOrthoConnection(ele: Connector, srcDir: Direction, tarDir: Direction, sPt: PointModel, tPt: PointModel): PointModel[] {
     let sourceEle: DiagramElement = ele.sourceWrapper; let targetEle: DiagramElement = ele.targetWrapper;
     let srcPort: DiagramElement = ele.sourcePortWrapper; let tarPort: DiagramElement = ele.targetPortWrapper;
-    let intermeditatePoints: PointModel[] = []; let refPoint: PointModel; let seg: NoOfSegments; let srcCor: Rect = sourceEle.corners;
-    let tarCor: Rect = targetEle.corners; let point: PointModel = tarCor.center; let i: number;
+    let intermeditatePoints: PointModel[] = []; let refPoint: PointModel; let seg: NoOfSegments; let srcCor: Corners = sourceEle.corners;
+    let tarCor: Corners = targetEle.corners; let point: PointModel = tarCor.center; let i: number;
     let sourceMargin: MarginModel = { left: 5, right: 5, bottom: 5, top: 5 };
     let targetMargin: MarginModel = { left: 5, right: 5, bottom: 5, top: 5 };
     let source: End = { corners: srcCor, point: sPt, direction: srcDir, margin: sourceMargin };
     let target: End = { corners: tarCor, point: tPt, direction: tarDir, margin: targetMargin };
+    let srcBounds: Corners = swapBounds(sourceEle, srcCor, ele.sourceWrapper.bounds);
+    let tarBounds: Corners = swapBounds(targetEle, tarCor, ele.targetWrapper.bounds);
     let isInterSect: boolean = false;
     if (ele.sourceWrapper && ele.targetWrapper) {
         isInterSect = checkSourceAndTargetIntersect(ele.sourceWrapper, ele.targetWrapper);
@@ -681,8 +737,8 @@ function defaultOrthoConnection(ele: Connector, srcDir: Direction, tarDir: Direc
             if (ele.segments && ele.segments.length > 0 && (ele.segments[0] as OrthogonalSegmentModel).direction) {
                 source.direction = (ele.segments[0] as OrthogonalSegmentModel).direction;
             }
-            source.point = findPoint(source.corners, source.direction);
-            refPoint = findEndPoint(source.direction, source.point, sourceEle);
+            source.point = findPoint(srcBounds, source.direction);
+            refPoint = findPoint(srcBounds, getOppositeDirection(source.direction));
             source.point = getIntersection(ele, sourceEle, source.point, refPoint, false);
         } else { source.point = sourceEle.corners.center; }
     }
@@ -703,8 +759,8 @@ function defaultOrthoConnection(ele: Connector, srcDir: Direction, tarDir: Direc
         }
     } else {
         if (ele.type === 'Orthogonal') {
-            target.point = findPoint(target.corners, target.direction);
-            refPoint = findEndPoint(target.direction, target.point, targetEle);
+            target.point = findPoint(tarBounds, target.direction);
+            refPoint = findPoint(tarBounds, getOppositeDirection(target.direction));
             target.point = getIntersection(ele, targetEle, target.point, refPoint, true);
         } else { target.point = targetEle.corners.center; }
     }
@@ -827,7 +883,7 @@ function nodeOrPortToNode(ele: Connector, source: End, target: End): PointModel[
     let point: PointModel[]; let portdirection: Direction;
     if (ele.sourcePortWrapper) {
         let port: PointModel = { x: ele.sourcePortWrapper.offsetX, y: ele.sourcePortWrapper.offsetY };
-        portdirection = getPortDirection(port, source.corners, ele.sourceWrapper.bounds, false);
+        portdirection = getPortDirection(port, cornersPointsBeforeRotation(ele.sourceWrapper), ele.sourceWrapper.bounds, false);
     }
     findDirection(ele.targetWrapper, source, target, ele);
     let direction: Direction = findSourceDirection(target.direction, source.point, target.point);
@@ -846,20 +902,20 @@ function nodeOrPortToNode(ele: Connector, source: End, target: End): PointModel[
             findDirection(ele.targetWrapper, source, target, ele);
         }
         point = orthoConnection3Segment(ele, source, target);
-    } else if (target.point.x >= source.corners.middleLeft.x && target.point.x <= source.corners.middleRight.x &&
-        source.point.y >= source.corners.topCenter.y && source.point.y <= source.corners.bottomCenter.y) {
+    } else if (target.point.x >= source.corners.left && target.point.x <= source.corners.right &&
+        source.point.y >= source.corners.top && source.point.y <= source.corners.bottom) {
         source.direction = (target.point.y > source.point.y) ? 'Bottom' : 'Top';
-        let length: number = (source.direction === 'Top') ? (source.point.y - source.corners.topCenter.y + 20) :
-            (source.corners.bottomCenter.y - source.point.y + 20);
+        let length: number = (source.direction === 'Top') ? (source.point.y - source.corners.top + 20) :
+            (source.corners.bottom - source.point.y + 20);
         point = orthoConnection3Segment(ele, source, target, length);
     } else if (ele.sourcePortWrapper && portdirection === getOppositeDirection(direction)) {
         let length: number;
-        if ((portdirection === 'Left' || portdirection === 'Right') && (source.point.y >= source.corners.topCenter.y
-            && source.point.y <= source.corners.bottomCenter.y)) {
+        if ((portdirection === 'Left' || portdirection === 'Right') && (source.point.y >= source.corners.top
+            && source.point.y <= source.corners.bottom)) {
             source.direction = (target.point.y > source.point.y) ? 'Bottom' : 'Top';
             length = source.corners.height / 2 + 20;
-        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x >= source.corners.middleLeft.x
-            && source.point.x <= source.corners.middleRight.x)) {
+        } else if ((portdirection === 'Top' || portdirection === 'Bottom') && (source.point.x >= source.corners.left
+            && source.point.x <= source.corners.right)) {
             source.direction = (target.point.x > source.point.x) ? 'Right' : 'Left';
             length = source.corners.width / 2 + 20;
         }
@@ -872,8 +928,8 @@ function nodeOrPortToNode(ele: Connector, source: End, target: End): PointModel[
     } else if (ele.sourcePortWrapper && portdirection === target.direction && (portdirection === 'Top' || portdirection === 'Bottom') &&
         (source.corners.center.x === target.corners.center.x)) {
         source.direction = (target.point.y > source.point.y) ? 'Bottom' : 'Top';
-        let len: number = (source.direction === 'Bottom') ? (source.corners.bottomCenter.y - source.point.y + 20) :
-            (source.point.y - source.corners.topCenter.y + 20);
+        let len: number = (source.direction === 'Bottom') ? (source.corners.bottom - source.point.y + 20) :
+            (source.point.y - source.corners.top + 20);
         point = orthoConnection3Segment(ele, source, target, len);
     } else {
         source.direction = direction;
@@ -884,29 +940,29 @@ function nodeOrPortToNode(ele: Connector, source: End, target: End): PointModel[
 
 function checkSourcePointInTarget(ele: Connector, source: End): void {
     if (ele.targetWrapper !== undefined && ele.targetPortWrapper === undefined) {
-        if (ele.targetWrapper.corners.containsPoint(source.point)) {
+        if (cornersPointsBeforeRotation(ele.targetWrapper).containsPoint(source.point)) {
             let target: DiagramElement = ele.targetWrapper;
             let segment: OrthogonalSegment = ele.segments[ele.segments.length - 2] as OrthogonalSegment;
             let lastPoint: PointModel = segment.points[segment.points.length - 1];
             let direction: Direction = getOppositeDirection(segment.direction) as Direction;
             if (direction === 'Bottom') {
-                if (lastPoint.y < target.corners.bottomCenter.y) {
-                    segment.points[segment.points.length - 1].y = target.corners.bottomCenter.y + 20;
+                if (lastPoint.y < target.corners.bottom) {
+                    segment.points[segment.points.length - 1].y = target.corners.bottom + 20;
                     segment.length = Point.distancePoints(segment.points[0], segment.points[segment.points.length - 1]);
                 }
             } else if (direction === 'Top') {
-                if (lastPoint.y > target.corners.topCenter.y) {
-                    segment.points[segment.points.length - 1].y = target.corners.topCenter.y - 20;
+                if (lastPoint.y > target.corners.top) {
+                    segment.points[segment.points.length - 1].y = target.corners.top - 20;
                     segment.length = Point.distancePoints(segment.points[0], segment.points[segment.points.length - 1]);
                 }
             } else if (direction === 'Left') {
-                if (lastPoint.x > target.corners.middleLeft.x) {
-                    segment.points[segment.points.length - 1].x = target.corners.middleLeft.x - 20;
+                if (lastPoint.x > target.corners.left) {
+                    segment.points[segment.points.length - 1].x = target.corners.left - 20;
                     segment.length = Point.distancePoints(segment.points[0], segment.points[segment.points.length - 1]);
                 }
             } else if (direction === 'Right') {
-                if (lastPoint.x < target.corners.middleRight.x) {
-                    segment.points[segment.points.length - 1].x = target.corners.middleRight.x + 20;
+                if (lastPoint.x < target.corners.right) {
+                    segment.points[segment.points.length - 1].x = target.corners.right + 20;
                     segment.length = Point.distancePoints(segment.points[0], segment.points[segment.points.length - 1]);
                 }
             }
@@ -982,7 +1038,8 @@ function returnIntermeditatePoints(element: Connector, intermeditatePoints: Poin
 
 function findDirection(node: DiagramElement, source: End, target: End, ele: Connector): void {
     let nodeDirection: Direction; let nodeConnectingPoint: PointModel = { x: 0, y: 0 };
-    let nodeCorners: Rect = node.corners; let nodeMargin: MarginModel = source.margin;
+    let nodeCorners: Corners = swapBounds(node, node.corners, node.bounds);
+    let nodeMargin: MarginModel = source.margin;
     let fixedPoint: PointModel = source.point;
     if (nodeCorners.bottomCenter.y + nodeMargin.bottom < fixedPoint.y) {
         nodeDirection = 'Bottom';
@@ -1025,7 +1082,7 @@ function findDirection(node: DiagramElement, source: End, target: End, ele: Conn
     }
     target.point = nodeConnectingPoint;
     target.direction = nodeDirection;
-    let refPoint: PointModel = findEndPoint(target.direction, target.point, node);
+    let refPoint: PointModel = findPoint(nodeCorners, getOppositeDirection(target.direction));
     target.point = getIntersection(ele, node, target.point, refPoint, node === ele.targetWrapper);
 }
 
@@ -1085,7 +1142,8 @@ export function findAngle(s: PointModel, e: PointModel): number {
     return ang;
 }
 
-function findPoint(cor: Rect, direction: string): PointModel {
+/** @private */
+export function findPoint(cor: Corners, direction: string): PointModel {
     let point: PointModel;
     switch (direction) {
         case 'Left':
@@ -1162,7 +1220,9 @@ function addLineSegment(point: PointModel, extra: number, angle: number): PointM
     let segEnd: PointModel = Point.transform(point, angle, extra);
     return segEnd;
 }
-function getIntersection(ele: Connector, bounds: DiagramElement, sPt: PointModel, tPt: PointModel, isTar: boolean): PointModel {
+
+/** @private */
+export function getIntersection(ele: Connector, bounds: DiagramElement, sPt: PointModel, tPt: PointModel, isTar: boolean): PointModel {
     sPt = { x: sPt.x, y: sPt.y };
     tPt = { x: tPt.x, y: tPt.y };
     let angle: number = Point.findAngle(tPt, sPt); let child: PathElement; let intersection: PointModel;
@@ -1171,23 +1231,25 @@ function getIntersection(ele: Connector, bounds: DiagramElement, sPt: PointModel
     let point: PointModel = isTar || ele.type === 'Orthogonal' ? sPt : tPt;
     let sourcePoint: PointModel = Point.transform(sPt, angle, Math.max(wrapper.actualSize.height / 2, wrapper.actualSize.width / 2));
     child = wrapper as PathElement;
+    let sPt1: PointModel = rotatePoint(-wrapper.parentTransform, wrapper.offsetX, wrapper.offsetY, sPt);
+    let tPt1: PointModel = rotatePoint(-wrapper.parentTransform, wrapper.offsetX, wrapper.offsetY, tPt);
     if (ele.type === 'Orthogonal') {
-        let constValue: number = Math.abs(child.bounds.height - child.actualSize.height) / 2 + 5;
-        if (sPt.x === tPt.x) {
-            if (sPt.y < tPt.y) {
-                sPt.y -= constValue;
+        let constValue: number = 5;
+        if (sPt1.x === tPt1.x) {
+            if (sPt1.y < tPt1.y) {
+                sPt1.y -= constValue;
             } else {
-                sPt.y += constValue;
+                sPt1.y += constValue;
             }
         }
-        constValue = Math.abs(child.bounds.width - child.actualSize.width) / 2 + 5;
-        if (sPt.y === tPt.y) {
-            if (sPt.x < tPt.x) {
-                sPt.x -= constValue;
+        if (sPt1.y === tPt1.y) {
+            if (sPt1.x < tPt1.x) {
+                sPt1.x -= constValue;
             } else {
-                sPt.x += constValue;
+                sPt1.x += constValue;
             }
         }
+        sPt = rotatePoint(wrapper.parentTransform, wrapper.offsetX, wrapper.offsetY, sPt1);
     } else {
         let angle: number = isTar ? Point.findAngle(sPt, tPt) : Point.findAngle(tPt, sPt);
         if (isTar) {
@@ -1208,8 +1270,8 @@ function getIntersection(ele: Connector, bounds: DiagramElement, sPt: PointModel
         segmentPoints[segmentPoints.length] = segmentPoints[0];
     }
     let length: number = segmentPoints.length;
-    let thisSegment: Segment = { X1: sPt.x, Y1: sPt.y, X2: tPt.x, Y2: tPt.y };
-    return getIntersectionPoints(thisSegment, segmentPoints, true, point) || ((isTar) ? tPt : sPt);
+    let thisSegment: Segment = { x1: sPt.x, y1: sPt.y, x2: tPt.x, y2: tPt.y };
+    return getIntersectionPoints(thisSegment, segmentPoints, true, point) || sPt;
 }
 
 
@@ -1228,8 +1290,8 @@ function setLineEndPoint(element: Connector, point: PointModel, isTarget: boolea
 export function getIntersectionPoints(thisSegment: Segment, pts: Object[], minimal: boolean, point: PointModel): PointModel {
     let length: number = pts.length; let min: number;
     let segment: Segment = {
-        X1: (pts[0] as PointModel).x, Y1: (pts[0] as PointModel).y, X2: (pts[1] as PointModel).x,
-        Y2: (pts[1] as PointModel).y
+        x1: (pts[0] as PointModel).x, y1: (pts[0] as PointModel).y, x2: (pts[1] as PointModel).x,
+        y2: (pts[1] as PointModel).y
     };
     let intersection: PointModel = intersectSegment(thisSegment, segment);
     if (intersection) {
@@ -1239,8 +1301,8 @@ export function getIntersectionPoints(thisSegment: Segment, pts: Object[], minim
     if (isNaN(min) || min > 0) {
         for (let i: number = 1; i < length - 1; i++) {
             segment = {
-                X1: (pts[i] as PointModel).x, Y1: (pts[i] as PointModel).y,
-                X2: (pts[i + 1] as PointModel).x, Y2: (pts[i + 1] as PointModel).y
+                x1: (pts[i] as PointModel).x, y1: (pts[i] as PointModel).y,
+                x2: (pts[i + 1] as PointModel).x, y2: (pts[i + 1] as PointModel).y
             };
             let intersect: PointModel = intersectSegment(thisSegment, segment);
             if (intersect) {
@@ -1257,10 +1319,10 @@ export function getIntersectionPoints(thisSegment: Segment, pts: Object[], minim
 }
 
 function intersectSegment(segment1: Segment, segment2: Segment): PointModel {
-    let x1: number = segment1.X1; let y1: number = segment1.Y1;
-    let x2: number = segment1.X2; let y2: number = segment1.Y2;
-    let x3: number = segment2.X1; let y3: number = segment2.Y1;
-    let x4: number = segment2.X2; let y4: number = segment2.Y2;
+    let x1: number = segment1.x1; let y1: number = segment1.y1;
+    let x2: number = segment1.x2; let y2: number = segment1.y2;
+    let x3: number = segment2.x1; let y3: number = segment2.y1;
+    let x4: number = segment2.x2; let y4: number = segment2.y2;
     let a1: number; let a2: number; let b1: number; let b2: number; let c1: number;
     let c2: number; let x: number; let y: number; let r1: number; let r2: number; let r3: number;
     let r4: number; let denom: number; let offset: number; let num: number;
@@ -1304,26 +1366,6 @@ function sameSign(a: number, b: number): boolean {
     return ((a * b) >= 0);
 }
 
-function findEndPoint(direction: string, point: PointModel, node: DiagramElement): PointModel {
-    let targetPoint: PointModel;
-    switch (direction) {
-        case 'Bottom':
-            targetPoint = { x: point.x, y: point.y - Math.max(node.actualSize.width, node.actualSize.height) };
-            break;
-        case 'Top':
-            targetPoint = { x: point.x, y: point.y + Math.max(node.actualSize.width, node.actualSize.height) };
-            break;
-        case 'Right':
-            targetPoint = { y: point.y, x: point.x - Math.max(node.actualSize.width, node.actualSize.height) };
-            break;
-        case 'Left':
-            targetPoint = { y: point.y, x: point.x + Math.max(node.actualSize.width, node.actualSize.height) };
-            break;
-    }
-    return targetPoint;
-}
-
-
 function getRightToLeftSegmentCount(element: Connector, source: End, target: End, swap: boolean): NoOfSegments {
     let srcPort: DiagramElement = element.sourcePortWrapper;
     let targetPort: DiagramElement = element.targetPortWrapper;
@@ -1337,29 +1379,30 @@ function getRightToLeftSegmentCount(element: Connector, source: End, target: End
         let point: PointModel;
         point = left; left = right; right = point;
     }
-    if (!(source.corners.bottomCenter.y + margin < target.corners.topCenter.y - margin ||
-        source.corners.topCenter.y - margin > target.corners.bottomCenter.y + margin)) {
+    if (!(source.corners.bottom + margin < target.corners.top - margin ||
+        source.corners.top - margin > target.corners.bottom + margin)) {
         margin = 0;
     }
     source.margin = { left: margin, right: margin, top: margin, bottom: margin };
     target.margin = { left: margin, right: margin, top: margin, bottom: margin };
-    if (diffY === 0 && (source.corners.middleRight.x < target.corners.middleLeft.x
-        || (swap && source.corners.middleRight.x < target.corners.middleLeft.x))) {
+    if (diffY === 0 && (source.corners.right < target.corners.left
+        || (swap && source.corners.right < target.corners.left))) {
         pts = NoOfSegments.One;
-    } else if (source.corners.middleRight.x + source.margin.right < target.corners.middleLeft.x - target.margin.left) {
+    } else if (source.point.x + source.margin.right < target.point.x - target.margin.left) {
         pts = NoOfSegments.Three;
     } else if (element.sourceWrapper !== element.targetWrapper &&
-        (source.corners.containsPoint(left) || target.corners.containsPoint(right))) {
+        (cornersPointsBeforeRotation(element.sourceWrapper).containsPoint(left) ||
+            cornersPointsBeforeRotation(element.targetWrapper).containsPoint(right))) {
         pts = NoOfSegments.Three;
-    } else if (source.corners.bottomCenter.y <= target.corners.topCenter.y) {
+    } else if (source.corners.bottom <= target.corners.top) {
         pts = NoOfSegments.Five;
-    } else if (source.corners.topCenter.y >= target.corners.topCenter.y) {
+    } else if (source.corners.top >= target.corners.top) {
         pts = NoOfSegments.Five;
-    } else if ((srcPort !== undefined && srcPort.offsetY <= target.corners.topCenter.y) ||
-        (srcPort === undefined && source.corners.middleRight.y <= target.corners.topCenter.y)) {
+    } else if ((srcPort !== undefined && srcPort.offsetY <= target.corners.top) ||
+        (srcPort === undefined && source.corners.right <= target.corners.top)) {
         pts = NoOfSegments.Five;
-    } else if ((srcPort !== undefined && srcPort.offsetY >= target.corners.bottomCenter.y) ||
-        (srcPort === undefined && source.corners.middleRight.y >= target.corners.bottomCenter.y)) {
+    } else if ((srcPort !== undefined && srcPort.offsetY >= target.corners.bottom) ||
+        (srcPort === undefined && source.corners.right >= target.corners.bottom)) {
         pts = NoOfSegments.Five;
     } else {
         pts = NoOfSegments.Five;
@@ -1375,40 +1418,40 @@ function getRightToRightSegmentCount(element: Connector, sourceObj: End, targetO
     let diffY: number = sourceObj.point.y - targetObj.point.y;
     targetObj.margin = { left: 10, right: 10, top: 10, bottom: 10 };
     sourceObj.margin = { left: 10, right: 10, top: 10, bottom: 10 };
-    if (sourceObj.corners.middleRight.x >= targetObj.corners.middleRight.x) {
-        if ((sourcePort !== undefined && (sourcePort.offsetY < targetObj.corners.topCenter.y ||
-            sourcePort.offsetY > targetObj.corners.bottomCenter.y)) ||
-            (sourcePort === undefined && sourceObj.corners.middleRight.y < targetObj.corners.topCenter.y)) {
+    if (sourceObj.corners.right >= targetObj.corners.right) {
+        if ((sourcePort !== undefined && (sourcePort.offsetY < targetObj.corners.top ||
+            sourcePort.offsetY > targetObj.corners.bottom)) ||
+            (sourcePort === undefined && sourceObj.corners.middleRight.y < targetObj.corners.top)) {
             pts = NoOfSegments.Three;
-        } else if ((sourcePort !== undefined && sourcePort.offsetY > targetObj.corners.bottomCenter.y + targetObj.margin.bottom
-            && sourceObj.corners.topCenter.y > targetObj.corners.bottomCenter.y) ||
-            (sourcePort === undefined && sourceObj.corners.middleRight.y > targetObj.corners.bottomCenter.y)) {
+        } else if ((sourcePort !== undefined && sourcePort.offsetY > targetObj.corners.bottom + targetObj.margin.bottom
+            && sourceObj.corners.top > targetObj.corners.bottom) ||
+            (sourcePort === undefined && sourceObj.corners.middleRight.y > targetObj.corners.bottom)) {
             pts = NoOfSegments.Three;
-        } else if ((sourcePort !== undefined && sourcePort.offsetY < targetObj.corners.topCenter.y
-            && sourceObj.corners.bottomCenter.y > targetObj.corners.topCenter.y) ||
-            (sourcePort === undefined && sourceObj.corners.middleRight.y > targetObj.corners.bottomCenter.y)) {
+        } else if ((sourcePort !== undefined && sourcePort.offsetY < targetObj.corners.top
+            && sourceObj.corners.bottom > targetObj.corners.top) ||
+            (sourcePort === undefined && sourceObj.corners.middleRight.y > targetObj.corners.bottom)) {
             pts = NoOfSegments.Three;
-        } else if (sourceObj.corners.middleRight.x < targetObj.corners.middleLeft.x ||
-            targetObj.corners.middleRight.x < sourceObj.corners.middleLeft.x) {
+        } else if (sourceObj.corners.right < targetObj.corners.left ||
+            targetObj.corners.right < sourceObj.corners.left) {
             pts = NoOfSegments.Five;
         } else if (diffX === 0 || diffY === 0) {
             pts = NoOfSegments.One;
         } else {
             pts = NoOfSegments.Three;
         }
-    } else if ((tarPort !== undefined && sourceObj.corners.bottomCenter.y < tarPort.offsetY) ||
-        (tarPort === undefined && sourceObj.corners.bottomCenter.y < targetObj.corners.middleRight.y)) {
+    } else if ((tarPort !== undefined && sourceObj.corners.bottom < tarPort.offsetY) ||
+        (tarPort === undefined && sourceObj.corners.bottom < targetObj.corners.middleRight.y)) {
         pts = NoOfSegments.Three;
-    } else if ((tarPort !== undefined && sourceObj.corners.topCenter.y > tarPort.offsetY) ||
-        (tarPort === undefined && sourceObj.corners.topCenter.y > targetObj.corners.middleRight.y)) {
+    } else if ((tarPort !== undefined && sourceObj.corners.top > tarPort.offsetY) ||
+        (tarPort === undefined && sourceObj.corners.top > targetObj.corners.middleRight.y)) {
         pts = NoOfSegments.Three;
-    } else if ((tarPort !== undefined && ((sourcePort !== undefined && sourcePort.offsetX < targetObj.corners.middleLeft.x &&
+    } else if ((tarPort !== undefined && ((sourcePort !== undefined && sourcePort.offsetX < targetObj.corners.left &&
         sourcePort.offsetX !== tarPort.offsetX && sourcePort.offsetY !== tarPort.offsetY &&
-        (Math.abs(sourceObj.corners.middleRight.x - targetObj.corners.middleLeft.x) <= 20)) ||
-        (sourcePort === undefined && sourceObj.corners.middleRight.x < targetObj.corners.middleLeft.x &&
+        (Math.abs(sourceObj.corners.right - targetObj.corners.left) <= 20)) ||
+        (sourcePort === undefined && sourceObj.corners.right < targetObj.corners.left &&
             sourceObj.corners.center.x !== targetObj.corners.center.x && sourceObj.corners.center.y !== targetObj.corners.center.y)))) {
         pts = NoOfSegments.Three;
-    } else if (sourceObj.corners.middleRight.x < targetObj.corners.middleLeft.x) {
+    } else if (sourceObj.corners.right < targetObj.corners.left) {
         pts = NoOfSegments.Five;
     } else if (diffX === 0 || diffY === 0) {
         pts = NoOfSegments.One;
@@ -1430,31 +1473,32 @@ function getRightToTopSegmentCount(element: Connector, source: End, target: End,
         let port: DiagramElement;
         port = srcPort; srcPort = tarPort; tarPort = port;
     }
-    if ((srcPort !== undefined && srcPort.offsetY < target.corners.topCenter.y - target.margin.top) ||
-        (srcPort === undefined && source.corners.bottomCenter.y < target.corners.topCenter.y - target.margin.top)) {
-        if (source.corners.bottomCenter.y < target.corners.topCenter.y) {
-            if ((tarPort !== undefined && source.corners.middleRight.x + source.margin.right < tarPort.offsetX) ||
-                (tarPort === undefined && source.corners.middleRight.x + source.margin.right < target.corners.topCenter.x)) {
+    if ((srcPort !== undefined && srcPort.offsetY < target.corners.top - target.margin.top) ||
+        (srcPort === undefined && source.corners.bottom < target.corners.top - target.margin.top)) {
+        if (source.corners.bottom < target.corners.top) {
+            if ((tarPort !== undefined && source.corners.right + source.margin.right < tarPort.offsetX) ||
+                (tarPort === undefined && source.corners.right + source.margin.right < target.corners.topCenter.x)) {
                 pts = NoOfSegments.Two;
             } else {
                 pts = NoOfSegments.Four;
             }
-        } else if ((tarPort !== undefined && source.corners.middleLeft.x > tarPort.offsetX) ||
-            (tarPort === undefined && source.corners.middleLeft.x > target.corners.topCenter.x)) {
+        } else if ((tarPort !== undefined && source.corners.left > tarPort.offsetX) ||
+            (tarPort === undefined && source.corners.left > target.corners.topCenter.x)) {
             pts = NoOfSegments.Four;
         } else {
             pts = NoOfSegments.Two;
         }
-    } else if (srcPort !== undefined && Math.abs(source.corners.middleRight.x - target.corners.middleLeft.x) <= 25 &&
-        Math.abs(srcPort.offsetY - target.corners.topCenter.y) <= 25) {
+    } else if (srcPort !== undefined && Math.abs(source.corners.right - target.corners.left) <= 25 &&
+        Math.abs(srcPort.offsetY - target.corners.top) <= 25) {
         pts = NoOfSegments.Two;
     } else if (tarPort !== undefined && Math.abs(tarPort.offsetX - source.corners.topCenter.x) >= 25 &&
         source.corners.middleRight.y < tarPort.offsetY) {
         pts = NoOfSegments.Two;
-    } else if (source.corners.middleRight.x < target.corners.middleLeft.x) {
+    } else if (source.corners.right < target.corners.left) {
         pts = NoOfSegments.Four;
     } else if (element.sourceWrapper !== element.targetWrapper &&
-        (source.corners.containsPoint(top) || target.corners.containsPoint(right))) {
+        (cornersPointsBeforeRotation(element.sourceWrapper).containsPoint(top) ||
+            cornersPointsBeforeRotation(element.targetWrapper).containsPoint(right))) {
         pts = NoOfSegments.Two;
     } else {
         pts = NoOfSegments.Four;
@@ -1474,26 +1518,26 @@ function getRightToBottomSegmentCount(element: Connector, source: End, target: E
         let port: DiagramElement;
         port = srcPort; srcPort = tarPort; tarPort = port;
     }
-    if ((srcPort !== undefined && srcPort.offsetY > target.corners.bottomCenter.y + target.margin.bottom) ||
-        (srcPort === undefined && source.corners.middleRight.y > target.corners.bottomCenter.y + target.margin.bottom)) {
-        if (source.corners.topCenter.y > target.corners.bottomCenter.y) {
-            if ((tarPort !== undefined && source.corners.middleRight.x + source.margin.right < tarPort.offsetX) ||
-                (tarPort === undefined && source.corners.middleRight.x + source.margin.right < target.corners.bottomCenter.x)) {
+    if ((srcPort !== undefined && srcPort.offsetY > target.corners.bottom + target.margin.bottom) ||
+        (srcPort === undefined && source.corners.middleRight.y > target.corners.bottom + target.margin.bottom)) {
+        if (source.corners.top > target.corners.bottom) {
+            if ((tarPort !== undefined && source.corners.right + source.margin.right < tarPort.offsetX) ||
+                (tarPort === undefined && source.corners.right + source.margin.right < target.corners.bottomCenter.x)) {
                 pts = NoOfSegments.Two;
             } else {
                 pts = NoOfSegments.Four;
             }
-        } else if ((tarPort !== undefined && source.corners.middleLeft.x > tarPort.offsetX) ||
-            (tarPort === undefined && source.corners.middleLeft.x > target.corners.bottomCenter.x)) {
+        } else if ((tarPort !== undefined && source.corners.left > tarPort.offsetX) ||
+            (tarPort === undefined && source.corners.left > target.corners.bottomCenter.x)) {
             pts = NoOfSegments.Four;
         } else {
             pts = NoOfSegments.Two;
         }
     } else if (srcPort !== undefined &&
-        Math.abs(source.corners.middleRight.x - target.corners.middleLeft.x) <= 25 &&
-        Math.abs(srcPort.offsetY - target.corners.bottomCenter.y) <= 25) {
+        Math.abs(source.corners.right - target.corners.left) <= 25 &&
+        Math.abs(srcPort.offsetY - target.corners.bottom) <= 25) {
         pts = NoOfSegments.Two;
-    } else if (source.corners.middleRight.x < target.corners.middleLeft.x) {
+    } else if (source.corners.right < target.corners.left) {
         pts = NoOfSegments.Four;
     } else {
         pts = NoOfSegments.Four;
@@ -1508,19 +1552,19 @@ function getBottomToTopSegmentCount(source: End, target: End): NoOfSegments {
     let bottom: PointModel = { x: source.point.x, y: Math.max(source.point.y, source.corners.bottom) };
     let top: PointModel = { x: target.point.x, y: Math.min(target.point.y, target.corners.top) };
     let margin: number = 10;
-    if (!(source.corners.middleRight.x + margin < target.corners.middleLeft.x - margin ||
-        source.corners.middleLeft.x - margin > target.corners.middleRight.x + margin)) {
+    if (!(source.corners.right + margin < target.corners.left - margin ||
+        source.corners.left - margin > target.corners.right + margin)) {
         margin = 0;
     }
     source.margin = { left: margin, right: margin, top: margin, bottom: margin };
     target.margin = { left: margin, right: margin, top: margin, bottom: margin };
-    if (diffX === 0 && source.corners.bottomCenter.y < target.corners.topCenter.y) {
+    if (diffX === 0 && source.corners.bottom < target.corners.top) {
         pts = NoOfSegments.One;
-    } else if (source.corners.bottomCenter.y + source.margin.bottom < target.corners.topCenter.y - target.margin.top) {
+    } else if (source.corners.bottom + source.margin.bottom < target.corners.top - target.margin.top) {
         pts = NoOfSegments.Three;
-    } else if (source.corners.middleRight.x + source.margin.right < target.corners.middleLeft.x - target.margin.left) {
+    } else if (source.corners.right + source.margin.right < target.corners.left - target.margin.left) {
         pts = NoOfSegments.Five;
-    } else if (source.corners.middleLeft.x - source.margin.left > target.corners.middleRight.x + target.margin.right) {
+    } else if (source.corners.left - source.margin.left > target.corners.right + target.margin.right) {
         pts = NoOfSegments.Five;
     } else {
         pts = NoOfSegments.Five;
@@ -1538,24 +1582,24 @@ function getBottomToLeftSegmentCount(element: Connector, source: End, target: En
         let port: DiagramElement;
         port = srcPort; srcPort = tarPort; tarPort = port;
     }
-    if ((srcPort !== undefined && srcPort.offsetX < target.corners.middleLeft.x - target.margin.left) ||
+    if ((srcPort !== undefined && srcPort.offsetX < target.corners.left - target.margin.left) ||
         (srcPort === undefined && source.corners.bottomCenter.x < target.corners.bottomLeft.x - target.margin.left)) {
-        if (source.corners.middleRight.x < target.corners.middleLeft.x) {
-            if ((tarPort !== undefined && source.corners.bottomCenter.y + source.margin.bottom < tarPort.offsetY) ||
-                (tarPort === undefined && source.corners.bottomCenter.y + source.margin.bottom < target.corners.middleLeft.y)) {
+        if (source.corners.right < target.corners.left) {
+            if ((tarPort !== undefined && source.corners.bottom + source.margin.bottom < tarPort.offsetY) ||
+                (tarPort === undefined && source.corners.bottom + source.margin.bottom < target.corners.middleLeft.y)) {
                 pts = NoOfSegments.Two;
             } else {
                 pts = NoOfSegments.Four;
             }
-        } else if ((tarPort !== undefined && source.corners.topCenter.y > tarPort.offsetY) ||
-            (tarPort === undefined && source.corners.topCenter.y > target.corners.middleLeft.y)) {
+        } else if ((tarPort !== undefined && source.corners.top > tarPort.offsetY) ||
+            (tarPort === undefined && source.corners.top > target.corners.middleLeft.y)) {
             pts = NoOfSegments.Four;
         } else {
             pts = NoOfSegments.Two;
         }
     } else if (tarPort !== undefined &&
-        Math.abs(source.corners.middleRight.x - target.corners.middleLeft.x) <= 25 &&
-        Math.abs(tarPort.offsetY - source.corners.bottomCenter.y) <= 25) {
+        Math.abs(source.corners.right - target.corners.left) <= 25 &&
+        Math.abs(tarPort.offsetY - source.corners.bottom) <= 25) {
         pts = NoOfSegments.Two;
     } else {
         pts = NoOfSegments.Four;
@@ -1569,28 +1613,28 @@ function getBottomToBottomSegmentCount(element: Connector, source: End, target: 
     let difX: number = Math.round(Math.abs(source.point.x - target.point.x));
     let diffY: number = Math.round(Math.abs(target.point.y - target.point.y));
     let pts: NoOfSegments;
-    if (source.corners.bottomCenter.y < target.corners.bottomCenter.y) {
-        if ((srcPort !== undefined && srcPort.offsetX < target.corners.middleLeft.x - target.margin.left) ||
-            (srcPort === undefined && source.corners.bottomCenter.x < target.corners.middleLeft.x - target.margin.left)) {
+    if (source.corners.bottom < target.corners.bottom) {
+        if ((srcPort !== undefined && srcPort.offsetX < target.corners.left - target.margin.left) ||
+            (srcPort === undefined && source.corners.bottomCenter.x < target.corners.left - target.margin.left)) {
             pts = NoOfSegments.Three;
-        } else if ((srcPort !== undefined && srcPort.offsetX > target.corners.middleRight.x + target.margin.right) ||
-            (srcPort === undefined && source.corners.bottomCenter.x > target.corners.middleRight.x + target.margin.right)) {
+        } else if ((srcPort !== undefined && srcPort.offsetX > target.corners.right + target.margin.right) ||
+            (srcPort === undefined && source.corners.bottomCenter.x > target.corners.right + target.margin.right)) {
             pts = NoOfSegments.Three;
-        } else if (source.corners.bottomCenter.y < target.corners.topCenter.y) {
+        } else if (source.corners.bottom < target.corners.top) {
             pts = NoOfSegments.Five;
         } else if (difX === 0 || diffY === 0) {
             pts = NoOfSegments.One;
         } else {
             pts = NoOfSegments.Three;
         }
-    } else if ((tarPort !== undefined && source.corners.middleLeft.x > tarPort.offsetX) ||
-        (tarPort === undefined && source.corners.middleLeft.x > target.corners.middleLeft.x)) {
+    } else if ((tarPort !== undefined && source.corners.left > tarPort.offsetX) ||
+        (tarPort === undefined && source.corners.left > target.corners.left)) {
         pts = NoOfSegments.Three;
-    } else if ((tarPort !== undefined && source.corners.middleRight.x < tarPort.offsetX) ||
+    } else if ((tarPort !== undefined && source.corners.right < tarPort.offsetX) ||
         (tarPort === undefined &&
-            source.corners.middleRight.x < target.corners.middleRight.x)) {
+            source.corners.right < target.corners.right)) {
         pts = NoOfSegments.Three;
-    } else if (source.corners.topCenter.y > target.corners.bottomCenter.y) {
+    } else if (source.corners.top > target.corners.bottom) {
         pts = NoOfSegments.Five;
     } else if (difX === 0 || diffY === 0) {
         pts = NoOfSegments.One;
@@ -1610,30 +1654,31 @@ function getLeftToTopSegmentCount(element: Connector, source: End, target: End, 
         let port: DiagramElement;
         port = sourcePort; sourcePort = tarPort; tarPort = port;
     }
-    if ((sourcePort !== undefined && sourcePort.offsetY < target.corners.topCenter.y - target.margin.top) ||
-        (sourcePort === undefined && (source.corners.bottomCenter.y < target.corners.topCenter.y - target.margin.top ||
-            source.corners.middleLeft.y < target.corners.topCenter.y - target.margin.top))) {
-        if (source.corners.bottomCenter.y < target.corners.topCenter.y) {
-            if ((tarPort !== undefined && source.corners.middleLeft.x - source.margin.left > tarPort.offsetX) ||
-                (tarPort === undefined && source.corners.middleLeft.x - source.margin.left > target.corners.topCenter.x)) {
+    if ((sourcePort !== undefined && sourcePort.offsetY < target.corners.top - target.margin.top) ||
+        (sourcePort === undefined && (source.corners.bottom < target.corners.top - target.margin.top ||
+            source.corners.middleLeft.y < target.corners.top - target.margin.top))) {
+        if (source.corners.bottom < target.corners.top) {
+            if ((tarPort !== undefined && source.corners.left - source.margin.left > tarPort.offsetX) ||
+                (tarPort === undefined && source.corners.left - source.margin.left > target.corners.topCenter.x)) {
                 pts = NoOfSegments.Two;
             } else {
                 pts = NoOfSegments.Four;
             }
-        } else if ((tarPort !== undefined && source.corners.middleRight.x < tarPort.offsetX) ||
-            (tarPort === undefined && source.corners.middleRight.x < target.corners.topCenter.x)) {
+        } else if ((tarPort !== undefined && source.corners.right < tarPort.offsetX) ||
+            (tarPort === undefined && source.corners.right < target.corners.topCenter.x)) {
             pts = NoOfSegments.Four;
         } else {
             pts = NoOfSegments.Two;
         }
     } else if (sourcePort !== undefined &&
-        Math.abs(source.corners.middleLeft.x - target.corners.middleRight.x) <= 25 &&
-        Math.abs(sourcePort.offsetY - target.corners.topCenter.y) <= 25) {
+        Math.abs(source.corners.left - target.corners.right) <= 25 &&
+        Math.abs(sourcePort.offsetY - target.corners.top) <= 25) {
         pts = NoOfSegments.Two;
     } else if (element.sourceWrapper !== element.targetWrapper &&
-        (source.corners.containsPoint(top) || target.corners.containsPoint(left))) {
+        (cornersPointsBeforeRotation(element.sourceWrapper).containsPoint(top) ||
+            cornersPointsBeforeRotation(element.targetWrapper).containsPoint(left))) {
         pts = NoOfSegments.Two;
-    } else if (source.corners.middleLeft.x > target.corners.middleRight.x) {
+    } else if (source.corners.left > target.corners.right) {
         pts = NoOfSegments.Four;
     } else {
         pts = NoOfSegments.Four;
@@ -1650,28 +1695,28 @@ function getLeftToLeftSegmentCount(element: Connector, source: End, target: End)
     let diffX: number = Math.round(Math.abs(source.point.x - target.point.x));
     let diffY: number = Math.round(Math.abs(source.point.y - target.point.y));
     let pts: NoOfSegments;
-    if (source.corners.middleLeft.x < target.corners.middleLeft.x) {
-        if ((targetPort !== undefined && source.corners.bottomCenter.y + source.margin.bottom < targetPort.offsetY) ||
-            (targetPort === undefined && source.corners.bottomCenter.y + source.margin.bottom < target.corners.middleLeft.y)) {
+    if (source.corners.left < target.corners.left) {
+        if ((targetPort !== undefined && source.corners.bottom + source.margin.bottom < targetPort.offsetY) ||
+            (targetPort === undefined && source.corners.bottom + source.margin.bottom < target.corners.middleLeft.y)) {
             pts = NoOfSegments.Three;
-        } else if ((targetPort !== undefined && source.corners.topCenter.y - source.margin.top > targetPort.offsetY) ||
-            (targetPort === undefined && source.corners.topCenter.y - source.margin.top > target.corners.middleLeft.y)) {
+        } else if ((targetPort !== undefined && source.corners.top - source.margin.top > targetPort.offsetY) ||
+            (targetPort === undefined && source.corners.top - source.margin.top > target.corners.middleLeft.y)) {
             pts = NoOfSegments.Three;
-        } else if (source.corners.middleRight.x < target.corners.middleLeft.x ||
-            target.corners.middleRight.x < source.corners.middleLeft.x) {
+        } else if (source.corners.right < target.corners.left ||
+            target.corners.right < source.corners.left) {
             pts = NoOfSegments.Five;
         } else if (diffX === 0 || diffY === 0) {
             pts = NoOfSegments.One;
         } else {
             pts = NoOfSegments.Three;
         }
-    } else if ((srcPort !== undefined && srcPort.offsetY < target.corners.topCenter.y - target.margin.top) ||
-        (srcPort === undefined && source.corners.middleLeft.y < target.corners.topCenter.y)) {
+    } else if ((srcPort !== undefined && srcPort.offsetY < target.corners.top - target.margin.top) ||
+        (srcPort === undefined && source.corners.middleLeft.y < target.corners.top)) {
         pts = NoOfSegments.Three;
-    } else if ((srcPort !== undefined && srcPort.offsetY > target.corners.bottomCenter.y + target.margin.bottom) ||
-        (srcPort === undefined && source.corners.middleLeft.y > target.corners.bottomCenter.y + target.margin.bottom)) {
+    } else if ((srcPort !== undefined && srcPort.offsetY > target.corners.bottom + target.margin.bottom) ||
+        (srcPort === undefined && source.corners.middleLeft.y > target.corners.bottom + target.margin.bottom)) {
         pts = NoOfSegments.Three;
-    } else if (source.corners.middleLeft.x > target.corners.middleRight.x) {
+    } else if (source.corners.left > target.corners.right) {
         pts = NoOfSegments.Five;
     } else if (diffX === 0 || diffY === 0) {
         pts = NoOfSegments.One;
@@ -1689,27 +1734,27 @@ function getTopToTopSegmentCount(element: Connector, source: End, target: End): 
     source.margin = { left: 10, right: 10, top: 10, bottom: 10 };
     let pts: NoOfSegments;
     target.margin = { left: 10, right: 10, top: 10, bottom: 10 };
-    if (source.corners.topCenter.y < target.corners.topCenter.y) {
-        if ((targetPort !== undefined && source.corners.middleLeft.x > targetPort.offsetX) ||
-            (targetPort === undefined && source.corners.middleLeft.x > target.corners.middleLeft.x)) {
+    if (source.corners.top < target.corners.top) {
+        if ((targetPort !== undefined && source.corners.left > targetPort.offsetX) ||
+            (targetPort === undefined && source.corners.left > target.corners.left)) {
             pts = NoOfSegments.Three;
-        } else if ((targetPort !== undefined && source.corners.middleRight.x < targetPort.offsetX) ||
-            (targetPort === undefined && source.corners.middleRight.x < target.corners.middleRight.x)) {
+        } else if ((targetPort !== undefined && source.corners.right < targetPort.offsetX) ||
+            (targetPort === undefined && source.corners.right < target.corners.right)) {
             pts = NoOfSegments.Three;
-        } else if (source.corners.bottomCenter.y < target.corners.topCenter.y) {
+        } else if (source.corners.bottom < target.corners.top) {
             pts = NoOfSegments.Five;
         } else if (diffX === 0 || diffY === 0) {
             pts = NoOfSegments.One;
         } else {
             pts = NoOfSegments.Three;
         }
-    } else if ((srcPort !== undefined && srcPort.offsetX > target.corners.middleRight.x) ||
-        (srcPort === undefined && source.corners.middleLeft.x > target.corners.middleRight.x)) {
+    } else if ((srcPort !== undefined && srcPort.offsetX > target.corners.right) ||
+        (srcPort === undefined && source.corners.left > target.corners.right)) {
         pts = NoOfSegments.Three;
-    } else if ((srcPort !== undefined && srcPort.offsetX < target.corners.middleLeft.x) ||
-        (srcPort === undefined && source.corners.bottomRight.x < target.corners.middleLeft.x)) {
+    } else if ((srcPort !== undefined && srcPort.offsetX < target.corners.left) ||
+        (srcPort === undefined && source.corners.bottomRight.x < target.corners.left)) {
         pts = NoOfSegments.Three;
-    } else if (source.corners.topCenter.y > target.corners.bottomCenter.y) {
+    } else if (source.corners.top > target.corners.bottom) {
         pts = NoOfSegments.Five;
     } else if (diffX === 0 || diffY === 0) {
         pts = NoOfSegments.One;
@@ -1724,14 +1769,9 @@ function addOrthoSegments(element: Connector, seg: NoOfSegments, source: End, ta
     let tar: DiagramElement = element.targetWrapper;
     let tarPort: DiagramElement = element.targetPortWrapper;
     let intermeditatePoints: PointModel[];
-    let srcCorner: Rect = src.corners;
-    let tarCorner: Rect = tar.corners;
-    if (tar !== undefined) {
-        if (tarPort === undefined) {
-            let refPoint: PointModel = findEndPoint(target.direction, target.point, tar);
-            target.point = getIntersection(element, tar, target.point, refPoint, true);
-        }
-    }
+    let srcCorner: Corners = src.corners;
+    let tarCorner: Corners = tar.corners;
+
     let extra: number = 20;
     if (source.direction !== target.direction || seg === NoOfSegments.Five) {
         if (source.direction === getOppositeDirection(target.direction) || seg === NoOfSegments.Three) {
@@ -1759,28 +1799,7 @@ function addOrthoSegments(element: Connector, seg: NoOfSegments, source: End, ta
             }
         }
     }
-    switch (source.direction) {
-        case 'Left':
-            if (source.point.x > srcCorner.middleLeft.x) {
-                extra = (source.point.x - srcCorner.middleLeft.x) > extra ? ((source.point.x - srcCorner.middleLeft.x) + extra) : extra;
-            }
-            break;
-        case 'Right':
-            if (source.point.x < srcCorner.middleRight.x) {
-                extra = (srcCorner.middleRight.x - source.point.x) > extra ? ((srcCorner.middleRight.x - source.point.x) + extra) : extra;
-            }
-            break;
-        case 'Top':
-            if (source.point.y > srcCorner.topCenter.y) {
-                extra = (source.point.y - srcCorner.topCenter.y) > extra ? ((source.point.y - srcCorner.topCenter.y) + extra) : extra;
-            }
-            break;
-        case 'Bottom':
-            if (source.point.y < srcCorner.bottomCenter.y) {
-                extra = (srcCorner.bottomCenter.y - source.point.y) > extra ? ((srcCorner.bottomCenter.y - source.point.y) + extra) : extra;
-            }
-            break;
-    }
+    extra = adjustSegmentLength(srcCorner, source, extra);
     if (segLength) {
         extra = Math.max(extra, segLength);
     }
@@ -1803,7 +1822,34 @@ function addOrthoSegments(element: Connector, seg: NoOfSegments, source: End, ta
     return intermeditatePoints;
 }
 
-function orthoConnection2Segment(source: End, target: End): PointModel[] {
+function adjustSegmentLength(bounds: Rect | Corners, source: End, extra: number): number {
+    switch (source.direction) {
+        case 'Left':
+            if (source.point.x > bounds.left) {
+                extra = (source.point.x - bounds.left) > extra ? ((source.point.x - bounds.left) + extra) : extra;
+            }
+            break;
+        case 'Right':
+            if (source.point.x < bounds.right) {
+                extra = (bounds.right - source.point.x) > extra ? ((bounds.right - source.point.x) + extra) : extra;
+            }
+            break;
+        case 'Top':
+            if (source.point.y > bounds.top) {
+                extra = (source.point.y - bounds.top) > extra ? ((source.point.y - bounds.top) + extra) : extra;
+            }
+            break;
+        case 'Bottom':
+            if (source.point.y < bounds.bottom) {
+                extra = (bounds.bottom - source.point.y) > extra ? ((bounds.bottom - source.point.y) + extra) : extra;
+            }
+            break;
+    }
+    return extra;
+}
+
+/** @private */
+export function orthoConnection2Segment(source: End, target: End): PointModel[] {
     let intermeditatePoints: PointModel[];
     switch (source.direction) {
         case 'Left':
@@ -1919,41 +1965,41 @@ function orthoConnection3Segment(element: Connector, source: End, target: End, e
 function orthoConnection5Segment(source: End, target: End, extra: number = 20): PointModel[] {
     let intermeditatePoints: PointModel[];
     let length: number = extra;
-    let sLeft: number = source.corners.middleLeft.x - source.margin.left;
-    let sRight: number = source.corners.middleRight.x + source.margin.right;
-    let sBottom: number = source.corners.bottomCenter.y + source.margin.bottom;
-    let sTop: number = source.corners.topCenter.y - source.margin.top;
-    let tLeft: number = target.corners.middleLeft.x - target.margin.left;
-    let tRight: number = target.corners.middleRight.x + target.margin.right;
-    let tBottom: number = target.corners.bottomCenter.y + target.margin.bottom;
-    let tTop: number = target.corners.topCenter.y - target.margin.top;
+    let sLeft: number = source.corners.left - source.margin.left;
+    let sRight: number = source.corners.right + source.margin.right;
+    let sBottom: number = source.corners.bottom + source.margin.bottom;
+    let sTop: number = source.corners.top - source.margin.top;
+    let tLeft: number = target.corners.left - target.margin.left;
+    let tRight: number = target.corners.right + target.margin.right;
+    let tBottom: number = target.corners.bottom + target.margin.bottom;
+    let tTop: number = target.corners.top - target.margin.top;
     let segmentValue: PointModel;
     switch (source.direction) {
         case 'Left':
             if ((sTop > tTop && sTop < tBottom || sBottom < tBottom && sBottom > tTop) &&
                 sLeft > tLeft && sLeft <= tRight && extra >= 20) {
-                length = source.point.x - target.corners.middleLeft.x + length;
+                length = source.point.x - target.corners.left + length;
             }
             segmentValue = addLineSegment(source.point, length, 180);
             break;
         case 'Top':
             if ((sLeft > tLeft && sLeft < tRight || sRight < tRight && sRight > tLeft) &&
                 sTop > tTop && sTop <= tBottom && extra >= 20) {
-                length = source.point.y - target.corners.topCenter.y + length;
+                length = source.point.y - target.corners.top + length;
             }
             segmentValue = addLineSegment(source.point, length, 270);
             break;
         case 'Right':
             if ((sTop > tTop && sTop < tBottom || sBottom < tBottom && sBottom > tTop) &&
                 sRight < tRight && sRight >= tLeft && extra >= 20) {
-                length = target.corners.middleRight.x - source.point.x + length;
+                length = target.corners.right - source.point.x + length;
             }
             segmentValue = addLineSegment(source.point, length, 0);
             break;
         case 'Bottom':
             if ((sLeft > tLeft && sLeft < tRight || sRight < tRight && sRight > tLeft) &&
                 sBottom < tBottom && sBottom >= tTop && extra >= 20) {
-                length = target.corners.bottomCenter.y - source.point.y + length;
+                length = target.corners.bottom - source.point.y + length;
             }
             segmentValue = addLineSegment(source.point, length, 90);
             break;
@@ -2252,15 +2298,15 @@ function swapPoints(source: End, target: End): void {
     let point: PointModel = source.point;
     source.point = target.point;
     target.point = point;
-    let corner: Rect = source.corners;
+    let corner: Corners = source.corners;
     source.corners = target.corners;
     target.corners = corner;
 }
 
 
-export function getPortDirection(point: PointModel, corner: Rect, bounds: Rect, closeEdge: boolean): Direction {
+export function getPortDirection(point: PointModel, corner: Corners, bounds: Rect, closeEdge: boolean): Direction {
     let direction: Direction;
-    let boundsValue: Rect = corner === undefined ? bounds : corner;
+    let boundsValue: Rect | Corners = corner === undefined ? bounds : corner;
     let one: PointModel = boundsValue.topLeft;
     let two: PointModel = boundsValue.topRight;
     let three: PointModel = boundsValue.bottomRight;
@@ -2389,13 +2435,6 @@ export function getOppositeDirection(direction: string): string {
     return 'auto';
 }
 
-/** @private */
-export interface Segment {
-    X1: number;
-    X2: number;
-    Y1: number;
-    Y2: number;
-}
 
 /** @private */
 export interface Intersection {
@@ -2443,8 +2482,8 @@ export interface Bridge {
 }
 
 /** @private */
-interface End {
-    corners: Rect;
+export interface End {
+    corners: Corners;
     point: PointModel;
     direction: Direction;
     margin: MarginModel;

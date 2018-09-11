@@ -5,20 +5,23 @@ import { ConnectorModel } from './../objects/connector-model';
 import { NodeConstraints, ConnectorConstraints, DiagramConstraints, DiagramTools, DiagramAction } from '../enum/enum';
 import { AnnotationConstraints, PortConstraints } from '../enum/enum';
 import { Connector } from './../objects/connector';
-import { AnnotationModel } from './../objects/annotation-model';
+import { AnnotationModel, PathAnnotationModel, ShapeAnnotationModel } from './../objects/annotation-model';
 import { PointPortModel } from './../objects/port-model';
 import { Selector } from './../interaction/selector';
 import { SelectorModel } from './../interaction/selector-model';
+import { ShapeAnnotation, PathAnnotation } from '../objects/annotation';
 
 /**
  * constraints-util module contains the common constraints
  */
 
 /** @private */
-export function canSelect(node: ConnectorModel | NodeModel): number {
+export function canSelect(node: ConnectorModel | NodeModel | PathAnnotationModel | ShapeAnnotationModel): number {
     if (node) {
         let state: number = 0;
-        if (node instanceof Connector) {
+        if ((node instanceof ShapeAnnotation) || (node instanceof PathAnnotation)) {
+            state = node.constraints & AnnotationConstraints.Select;
+        } else if (node instanceof Connector) {
             state = node.constraints & ConnectorConstraints.Select;
         } else {
             state = node.constraints & NodeConstraints.Select;
@@ -29,10 +32,12 @@ export function canSelect(node: ConnectorModel | NodeModel): number {
 }
 
 /** @private */
-export function canMove(node: ConnectorModel | NodeModel | SelectorModel): number {
+export function canMove(node: ConnectorModel | NodeModel | SelectorModel | ShapeAnnotationModel | PathAnnotationModel): number {
     if (node) {
         let state: number = 0;
-        if (node instanceof Connector) {
+        if ((node instanceof ShapeAnnotation) || (node instanceof PathAnnotation)) {
+            state = node.constraints & AnnotationConstraints.Drag;
+        } else if (node instanceof Connector) {
             state = node.constraints & ConnectorConstraints.Drag;
         } else if (node instanceof Selector) {
             state = 1;
@@ -95,8 +100,12 @@ export function canDragSegmentThumb(connector: Connector): number {
 }
 
 /** @private */
-export function canRotate(node: NodeModel): number {
-    return node.constraints & NodeConstraints.Rotate;
+export function canRotate(node: NodeModel | ShapeAnnotationModel | PathAnnotationModel): number {
+    if ((node instanceof ShapeAnnotation) || (node instanceof PathAnnotation)) {
+        return node.constraints & AnnotationConstraints.Rotate;
+    } else {
+        return node.constraints & NodeConstraints.Rotate;
+    }
 }
 
 /** @private */
@@ -123,9 +132,11 @@ export function canOutConnect(node: NodeModel): number {
 }
 
 /** @private */
-export function canResize(node: NodeModel, direction?: string): number {
+export function canResize(node: NodeModel | ShapeAnnotationModel | PathAnnotationModel, direction?: string): number {
     let returnValue: number = 0;
-    if (node) {
+    if (node instanceof ShapeAnnotation || node instanceof PathAnnotation) {
+        returnValue = node.constraints & AnnotationConstraints.Resize;
+    } else if (node) {
         if (direction === 'SouthEast') {
             returnValue = node.constraints & NodeConstraints.ResizeSouthEast;
         } else if (direction === 'East') {
@@ -235,6 +246,11 @@ export function canPanX(model: Diagram): number {
 /** @private */
 export function canPanY(model: Diagram): number {
     return ((model.constraints & DiagramConstraints.PanY));
+}
+
+/** @private */
+export function canZoomTextEdit(diagram: Diagram): number {
+    return ((diagram.constraints & DiagramConstraints.ZoomTextEdit));
 }
 
 /** @private */

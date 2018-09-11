@@ -4,7 +4,7 @@
 import { createElement } from '@syncfusion/ej2-base';
 import { Diagram } from '../../../src/diagram/diagram';
 import {
-    ConnectorModel, Node, TextModel,
+    ConnectorModel, Node, TextModel, Connector,
     DataBinding, HierarchicalTree, NodeModel, Rect, TextElement, LayoutAnimation, Container, StackPanel, ImageElement, TreeInfo
 } from '../../../src/diagram/index';
 Diagram.Inject(DataBinding, HierarchicalTree);
@@ -40,7 +40,13 @@ let assitants: object[] = [
     { 'Id': '21', 'Role': 'Quality Department', 'Manager': '16', 'color': '#2E95D8' }
 ];
 
-
+let assitants1: object[] = [
+    { 'Id': 'parent', 'Role': 'Board', 'color': '#71AF17' },
+    { 'Id': '1', 'Role': 'General Manager', 'Manager': 'parent', 'ChartType': 'Right', 'color': '#71AF17' },
+    { 'Id': '11', 'Role': 'Assistant Manager', 'Manager': '1', 'color': '#71AF17' },
+    { 'Id': '2', 'Role': 'Human Resource Manager', 'Manager': '1', 'ChartType': 'Right', 'color': '#1859B7' },
+    { 'Id': '3', 'Role': 'Trainers', 'Manager': '2', 'color': '#2E95D8' },
+];
 let data: object[] = [
     { id: 1, Label: 'StackPanel' },
     { id: 2, Label: 'Label', parentId: 1 },
@@ -1070,6 +1076,169 @@ describe('Tree Layout', () => {
     });
 });
 
+describe('Organization chart', () => {
+    let diagram: Diagram;
+    let ele: HTMLElement;
+    beforeAll(() => {
+        ele = createElement('div', { id: 'diagramOrgChart32' });
+        document.body.appendChild(ele);
+        let items: DataManager = new DataManager(assitants1 as JSON[], new Query().take(7));
+
+        diagram = new Diagram({
+            width: '100%', height: '700px',
+            snapSettings: { constraints: 0 },
+            layout: {
+                type: 'OrganizationalChart', orientation: 'BottomToTop', horizontalSpacing: 30, verticalSpacing: 30,
+                getLayoutInfo: (node: Node, options: TreeInfo) => {
+                    if (node.data['Role'] === 'General Manager') {
+                        options.assistants.push(options.children[0]);
+                        options.children.splice(0, 1);
+                    }
+                    if (!options.hasSubTree) {
+                        options.offset = -50;
+                        options.type = 'Left';
+                        options.orientation = 'Vertical';
+                    }
+                }
+            },
+            dataSourceSettings: {
+                id: 'Id', parentId: 'Manager', dataManager: items
+            },
+
+            getNodeDefaults: (obj: Node, diagram: Diagram) => {
+                obj.width = 150;
+                obj.height = 50;
+                obj.style.fill = obj.data['color'];
+                obj.annotations = [{ content: obj.data['Role'], style: { color: 'white' } }];
+                return obj;
+            }, getConnectorDefaults: (connector: ConnectorModel, diagram: Diagram) => {
+                connector.targetDecorator.shape = 'None';
+                connector.type = 'Orthogonal';
+                return connector;
+            }
+        });
+        diagram.appendTo('#diagramOrgChart32');
+    });
+
+    afterAll(() => {
+        diagram.destroy();
+        ele.remove();
+    });
+
+    it('Checking organizational chart- orientation (Bottom to Top), type (Left) and the offset value is negative', (done: Function) => {
+        
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.topCenter.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.topCenter.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.middleRight.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.middleRight.y).toBe(true);
+        done();
+    });
+    it('Checking organizational chart- orientation (Bottom to Top), type (Right) and the offset value is negative', (done: Function) => {
+        diagram.layout.type = 'OrganizationalChart';
+        diagram.layout.getLayoutInfo = (node: NodeModel, options: TreeInfo) => {
+            if (node.data['Role'] === 'General Manager') {
+                options.assistants.push(options.children[0]);
+                options.children.splice(0, 1);
+            }
+            if (!options.hasSubTree) {
+                options.offset = -50;
+                options.type = 'Right';
+                options.orientation = 'Vertical';
+            }
+        };
+        diagram.dataBind();
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.topCenter.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.topCenter.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.middleLeft.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.middleLeft.y).toBe(true);
+        done();
+    });
+    it('Checking organizational chart- orientation (Left to Right), type (Left) and the offset value is negative', (done: Function) => {
+        diagram.layout.type = 'OrganizationalChart';
+        diagram.layout.orientation = 'LeftToRight';
+        diagram.layout.getLayoutInfo = (node: NodeModel, options: TreeInfo) => {
+            if (node.data['Role'] === 'General Manager') {
+                options.assistants.push(options.children[0]);
+                options.children.splice(0, 1);
+            }
+            if (!options.hasSubTree) {
+                options.offset = -50;
+                options.type = 'Left';
+                options.orientation = 'Vertical';
+            }
+        };
+        diagram.dataBind();
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleRight.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleRight.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.topCenter.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.topCenter.y).toBe(true);
+        done();
+    });
+    it('Checking organizational chart- orientation (Left to Right), type (Right) and the offset value is negative', (done: Function) => {
+        diagram.layout.type = 'OrganizationalChart';
+        diagram.layout.orientation = 'LeftToRight';
+        diagram.layout.getLayoutInfo = (node: NodeModel, options: TreeInfo) => {
+            if (node.data['Role'] === 'General Manager') {
+                options.assistants.push(options.children[0]);
+                options.children.splice(0, 1);
+            }
+            if (!options.hasSubTree) {
+                options.offset = -50;
+                options.type = 'Right';
+                options.orientation = 'Vertical';
+            }
+        };
+        diagram.dataBind();
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleRight.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleRight.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.bottomCenter.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.bottomCenter.y).toBe(true);
+        done();
+    });
+    it('Checking organizational chart- orientation (Right to Left), type (Left) and the offset value is negative', (done: Function) => {
+        diagram.layout.type = 'OrganizationalChart';
+        diagram.layout.orientation = 'RightToLeft';
+        diagram.layout.getLayoutInfo = (node: NodeModel, options: TreeInfo) => {
+            if (node.data['Role'] === 'General Manager') {
+                options.assistants.push(options.children[0]);
+                options.children.splice(0, 1);
+            }
+            if (!options.hasSubTree) {
+                options.offset = -50;
+                options.type = 'Left';
+                options.orientation = 'Vertical';
+            }
+        };
+        diagram.dataBind();
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleLeft.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleLeft.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.topCenter.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.topCenter.y).toBe(true);
+        done();
+    });
+    it('Checking organizational chart- orientation (Left to Right), type (Right) and the offset value is negative', (done: Function) => {
+        diagram.layout.type = 'OrganizationalChart';
+        diagram.layout.orientation = 'RightToLeft';
+        diagram.layout.getLayoutInfo = (node: NodeModel, options: TreeInfo) => {
+            if (node.data['Role'] === 'General Manager') {
+                options.assistants.push(options.children[0]);
+                options.children.splice(0, 1);
+            }
+            if (!options.hasSubTree) {
+                options.offset = -50;
+                options.type = 'Right';
+                options.orientation = 'Vertical';
+            }
+        };
+        diagram.dataBind();
+        expect(diagram.connectors[3].sourcePoint.x == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleLeft.x &&
+            diagram.connectors[3].sourcePoint.y == (diagram.connectors[3] as Connector).sourceWrapper.bounds.middleLeft.y &&
+            diagram.connectors[3].targetPoint.x == (diagram.connectors[3] as Connector).targetWrapper.bounds.bottomCenter.x &&
+            diagram.connectors[3].targetPoint.y == (diagram.connectors[3] as Connector).targetWrapper.bounds.bottomCenter.y).toBe(true);
+        done();
+    });
+});
+
 describe('Tree Layout', () => {
     let diagram: Diagram;
     let ele: HTMLElement;
@@ -1496,4 +1665,48 @@ describe('Tree Layout', () => {
         }, 200);
     });
 });
-
+describe('Connector Update in Layout Issue', () => {
+    let diagram: Diagram;
+    let ele: HTMLElement;
+    beforeAll(() => {
+        ele = createElement('div', { id: 'diagramConnectorUpdateInLayoutIssue' });
+        document.body.appendChild(ele);
+        let data: object[] = [
+            { id: 1, Label: 'StackPanel' },
+            { id: 2, Label: 'Label', parentId: 1 },
+            { id: 3, Label: 'ListBox', parentId: 1 }
+        ];
+        let items: DataManager = new DataManager(data as JSON[], new Query().take(7));
+        diagram = new Diagram({
+            width: '900px', height: '550px',
+            layout: { type: 'HierarchicalTree' },
+            dataSourceSettings: { id: 'id', parentId: 'parentId', dataManager: items },
+            getNodeDefaults: (obj: Node) => {
+                obj.shape = { type: 'Text', content: (obj.data as { Label: 'string' }).Label };
+                obj.style = { fill: 'lightgrey', strokeColor: 'none', strokeWidth: 2 };
+                obj.borderColor = 'black';
+                obj.backgroundColor = 'lightgrey';
+                obj.borderWidth = 1;
+                (obj.shape as TextModel).margin = { left: 5, right: 5, top: 5, bottom: 5 };
+                return obj;
+            }, getConnectorDefaults: (connector: ConnectorModel, diagram: Diagram) => {
+                connector.type = 'Orthogonal';
+                return connector;
+            }
+        });
+        diagram.appendTo('#diagramConnectorUpdateInLayoutIssue');
+    });
+    afterAll(() => {
+        diagram.destroy();
+        ele.remove();
+    });
+    it('Checking Connector update in DOM - After checking the layout', (done: Function) => {
+        diagram.layout.type = "OrganizationalChart";
+        diagram.dataBind();
+        let id = diagram.connectors[0].id;
+        let x = document.getElementById(id).getAttribute('x');
+        let y = document.getElementById(id).getAttribute('y');
+        expect(x == '433.5' && y == '72.5').toBe(true);
+        done();
+    });
+});

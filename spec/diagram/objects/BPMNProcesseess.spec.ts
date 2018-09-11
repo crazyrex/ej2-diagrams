@@ -1,7 +1,7 @@
 import { createElement } from '@syncfusion/ej2-base';
 import { Diagram } from '../../../src/diagram/diagram';
 import { NodeModel, BasicShapeModel, BpmnActivityModel, BpmnSubProcessModel } from '../../../src/diagram/objects/node-model';
-import { NodeConstraints, ConnectorModel, BpmnShape, LinearGradientModel } from '../../../src/index';
+import { NodeConstraints, ConnectorModel, BpmnShape,LinearGradientModel } from '../../../src/index';
 import { MouseEvents } from '../../diagram/interaction/mouseevents.spec';
 
 
@@ -1366,6 +1366,95 @@ describe('Diagram Control', () => {
             done();
 
         });
+
+    });
+    describe('BPMN processes ', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+        let mouseEvents: MouseEvents = new MouseEvents();
+
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagram' });
+            document.body.appendChild(ele);
+            let nod: NodeModel = {
+                id: 'nod', width: 50, height: 50, //maxHeight: 600, maxWidth: 600, minWidth: 300, minHeight: 300,
+                constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
+                offsetX: 200, offsetY: 200,
+                shape: {
+                    type: 'Bpmn', shape: 'Activity',
+                    activity: {
+                        activity: 'SubProcess',
+                        subProcess: {
+                            collapsed: false, type: 'Event', events: [{
+                                id: 'event1', offset: { x: 0, y: 0.5 }
+                            }]
+                        },
+                    }
+                }
+            };
+            let nod1: NodeModel = {
+                id: 'nod1', width: 100, height: 100, offsetX: 300, offsetY: 300, margin: { top: 200 },
+                constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
+
+                shape: {
+                    type: 'Bpmn', shape: 'Activity', activity: {
+                        activity: 'SubProcess',
+                        subProcess: { collapsed: false } as BpmnSubProcessModel
+                    } as BpmnActivityModel,
+                },
+            };
+            let nodea: NodeModel = {
+                id: 'nodea', width: 400, height: 400, maxHeight: 600, maxWidth: 600, minWidth: 300, minHeight: 300,
+                constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
+                offsetX: 200, offsetY: 200,
+                shape: {
+                    type: 'Bpmn', shape: 'Activity', activity: {
+                        activity: 'SubProcess',
+                        subProcess: {
+                            collapsed: false, type: 'Event',
+                            processes: ['start', 'nod']
+                        } as BpmnSubProcessModel
+                    } as BpmnActivityModel,
+                },
+            };
+            let start: NodeModel = {
+                id: 'start', shape: { type: 'Bpmn', shape: 'Event' }, width: 100, height: 100,
+                margin: { left: 10, top: 50 }
+            };
+
+            let end: NodeModel = {
+                id: 'end', shape: { type: 'Bpmn', shape: 'Event', event: 'End' }, width: 100, height: 100,
+                offsetX: 0, offsetY: 0,
+                margin: { left: 300, top: 50 }
+            };
+            let connector6: ConnectorModel[] = [{
+                id: 'connector6', type: 'Straight', sourceID: 'start', targetID: 'nod1'
+            },
+            {
+                id: 'connector2', type: 'Straight', sourceID: 'nod1', targetID: 'end'
+            }];
+            diagram = new Diagram({
+                width: 1200, height: 1200, nodes: [ end, nodea,nod, nod1, start], connectors: connector6
+            });
+
+            diagram.appendTo('#diagram');
+        });
+
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+
+        it('drag and drop the processes with low z index ', (done: Function) => {
+            debugger
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            let node = diagram.nameTable['end'].wrapper;
+            mouseEvents.dragAndDropEvent(diagramCanvas, node.bounds.center.x, node.bounds.center.y, 225,225);
+            expect((diagram.nodes[0].shape as BpmnShape).activity.subProcess.collapsed).toBe(true);
+            done()
+        });
+
+
 
     });
 

@@ -203,9 +203,6 @@ export class DiagramScroller {
             scale: this.currentZoom
         };
         this.setSize();
-        if (this.scrolled) {
-            this.diagram.endEdit();
-        }
     }
     /** @private */
     public setSize(): void {
@@ -230,9 +227,14 @@ export class DiagramScroller {
         }
         this.hScrollSize = hScrollSize;
         this.vScrollSize = vScrollSize;
+        let oldWidth: number = this.diagramWidth;
+        let oldHeight: number = this.diagramHeight;
         this.diagramWidth = Math.max(pageBounds.right, -this.horizontalOffset + this.viewPortWidth - vScrollSize) - x;
         this.diagramHeight = Math.max(pageBounds.bottom, -this.verticalOffset + this.viewPortHeight - hScrollSize) - y;
-        this.diagram.setSize(this.diagramWidth, this.diagramHeight);
+        if (oldWidth !== this.diagramWidth || oldHeight !== this.diagramHeight) {
+            this.diagram.setSize(this.diagramWidth, this.diagramHeight);
+        }
+        this.diagram.transformLayers();
         this.diagram.element.style.overflow = 'hidden';
     }
     /** @private */

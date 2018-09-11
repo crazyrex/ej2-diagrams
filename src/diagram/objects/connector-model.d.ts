@@ -19,8 +19,28 @@ export interface DecoratorModel {
     height?: number;
 
     /**
-     * Sets the shape of the decorator
-     * @default 'Arrow'
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourcePoint: { x: 500, y: 100 }, targetPoint: { x: 600, y: 200 },
+     *   sourceDecorator: {
+     *    style: { fill: 'black' },
+     *    shape: 'Arrow',
+     *    pivot: { x: 0, y: 0.5 }},
+     *   targetDecorator: {
+     *    shape: 'Diamond',
+     *    style: { fill: 'blue' },
+     *    pivot: { x: 0, y: 0.5 }}
+     *  },];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     shape?: DecoratorShapes;
 
@@ -49,13 +69,13 @@ export interface DecoratorModel {
 export interface VectorModel {
 
     /**
-     * Defines the angle for the bezier curve
+     * Defines the angle between the connector end point and control point of the bezier segment
      * @default 0
      */
     angle?: number;
 
     /**
-     * Defines the distance for the bezier curve
+     * Defines the distance between the connector end point and control point of the bezier segment
      * @default 0
      */
     distance?: number;
@@ -68,7 +88,8 @@ export interface VectorModel {
 export interface ConnectorShapeModel {
 
     /**
-     * Defines the type of node shape
+     * Defines the application specific type of connector
+     * * Bpmn - Sets the type of the connection shape as Bpmn
      * @default 'None'
      */
     type?: ConnectionShapes;
@@ -82,24 +103,55 @@ export interface BpmnFlowModel extends ConnectorShapeModel{
 
     /**
      * Sets the type of the Bpmn flows
+     * * Sequence - Sets the type of the Bpmn Flow as Sequence
+     * * Association - Sets the type of the Bpmn Flow as Association
+     * * Message - Sets the type of the Bpmn Flow as Message
      * @default 'Sequence'
      */
     flow?: BpmnFlows;
 
     /**
      * Sets the type of the Bpmn Sequence flows
+     * * Default - Sets the type of the sequence flow as Default
+     * * Normal - Sets the type of the sequence flow as Normal
+     * * Conditional - Sets the type of the sequence flow as Conditional
      * @default 'Normal'
      */
     sequence?: BpmnSequenceFlows;
 
     /**
-     * Sets the type of the Bpmn message flows
-     * @default ''
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let nodes: NodeModel[] = [
+     * {
+     *   id: 'node1', width: 60, height: 60, offsetX: 75, offsetY: 90,
+     *   shape: { type: 'Bpmn', shape: 'Event', event: { event: 'Start', trigger: 'Message' } },
+     *     },
+     * {
+     *   id: 'node2', width: 75, height: 70, offsetX: 210, offsetY: 90,
+     *   shape: { type: 'Bpmn', shape: 'Gateway', gateway: { type: 'None' } },
+     *  }];
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourceID: 'node1', targetID: 'node2',
+     *   shape: { type: 'Bpmn', flow: 'Message', message: 'InitiatingMessage' } as BpmnFlowModel
+     *  },];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * nodes: nodes, connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     message?: BpmnMessageFlows;
 
     /**
      * Sets the type of the Bpmn association flows
+     * * Default - Sets the type of Association flow as Default
+     * * Directional - Sets the type of Association flow as Directional
+     * * BiDirectional - Sets the type of Association flow as BiDirectional
      * @default ''
      */
     association?: BpmnAssociationFlows;
@@ -112,7 +164,10 @@ export interface BpmnFlowModel extends ConnectorShapeModel{
 export interface ConnectorSegmentModel {
 
     /**
-     * Defines the type of the connector
+     * Defines the type of the segment
+     * * Straight - Sets the segment type as Straight
+     * * Orthogonal - Sets the segment type as Orthogonal
+     * * Bezier - Sets the segment type as Bezier
      * @default 'Straight'
      */
     type?: Segments;
@@ -121,7 +176,6 @@ export interface ConnectorSegmentModel {
 
 /**
  * Interface for a class StraightSegment
- * @private
  */
 export interface StraightSegmentModel extends ConnectorSegmentModel{
 
@@ -140,25 +194,25 @@ export interface BezierSegmentModel extends StraightSegmentModel{
 
     /**
      * Sets the first control point of the connector
-     * @default new Point(0,0)
+     * @default {}
      */
     point1?: PointModel;
 
     /**
      * Sets the second control point of the connector
-     * @default new Point(0,0)
+     * @default {}
      */
     point2?: PointModel;
 
     /**
-     * Defines the first vector point of the bezier connector
-     * @default new Vector()
+     * Defines the length and angle between the source point and the first control point of the diagram
+     * @default {}
      */
     vector1?: VectorModel;
 
     /**
-     * Defines the second vector point of the bezier connector
-     * @default new Vector()
+     * Defines the length and angle between the target point and the second control point of the diagram
+     * @default {}
      */
     vector2?: VectorModel;
 
@@ -171,12 +225,39 @@ export interface OrthogonalSegmentModel extends ConnectorSegmentModel{
 
     /**
      * Defines the length of orthogonal segment
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *       id: 'link2', sourcePoint: { x: 0, y: 0 }, targetPoint: { x: 40, y: 40 }, type: 'Orthogonal',
+     *       shape: {
+     *           type: 'Bpmn',
+     *           flow: 'Message',
+     *           association: 'directional'
+     *       }, style: {
+     *           strokeDashArray: '2,2'
+     *       },
+     *       segments: [{ type: 'Orthogonal', length: 30, direction: 'Bottom' },
+     *       { type: 'Orthogonal', length: 80, direction: 'Right' }]
+     *   }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default 0
      */
     length?: number;
 
     /**
      * Sets the direction of orthogonal segment
+     * * Left - Sets the direction type as Left
+     * * Right - Sets the direction type as Right
+     * * Top - Sets the direction type as Top
+     * * Bottom - Sets the direction type as Bottom
      * @default null
      */
     direction?: Direction;
@@ -197,6 +278,21 @@ export interface ConnectorModel extends NodeBaseModel{
 
     /**
      * Defines the constraints of connector
+     * * None - Interaction of the connectors cannot be done.
+     * * Select - Selects the connector.
+     * * Delete - Delete the connector.
+     * * Drag - Drag the connector.
+     * * DragSourceEnd - Drag the source end of the connector.
+     * * DragTargetEnd - Drag the target end of the connector.
+     * * DragSegmentThump - Drag the segment thumb of the connector.
+     * * AllowDrop - Allow to drop a node.
+     * * Bridging - Creates bridge  on intersection of two connectors.
+     * * InheritBridging - Creates bridge  on intersection of two connectors.
+     * * PointerEvents - Sets the pointer events.
+     * * Tooltip - Displays a tooltip for the connectors.
+     * * InheritToolTip - Displays a tooltip for the connectors.
+     * * Interaction - Features of the connector used for interaction.
+     * * ReadOnly - Enables ReadOnly
      * @default 'None'
      * @aspNumberEnum 
      */
@@ -209,9 +305,21 @@ export interface ConnectorModel extends NodeBaseModel{
     bridgeSpace?: number;
 
     /**
-     * Defines the collection of textual annotations of connectors
-     * @aspDefaultValueIgnore
-     * @default undefined
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourcePoint: { x: 500, y: 100 }, targetPoint: { x: 600, y: 200 },
+     * annotations: [{ content: 'No', offset: 0, alignment: 'After' }]
+     * ];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     annotations?: PathAnnotationModel[];
 
@@ -254,6 +362,9 @@ export interface ConnectorModel extends NodeBaseModel{
 
     /**
      * Defines the type of the connector
+     * * Straight - Sets the segment type as Straight
+     * * Orthogonal - Sets the segment type as Orthogonal
+     * * Bezier - Sets the segment type as Bezier
      * @default 'Straight'
      */
     type?: Segments;

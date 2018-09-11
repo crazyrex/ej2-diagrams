@@ -1,7 +1,7 @@
 import { Component, Property } from '@syncfusion/ej2-base';
 import { INotifyPropertyChanged } from '@syncfusion/ej2-base';
 import { RulerModel } from './ruler-model';
-import { createSvgElement, setAttributeSvg } from '../diagram/utility/dom-util';
+import { createSvgElement, createHtmlElement, setAttributeSvg } from '../diagram/utility/dom-util';
 import { Size } from '../diagram/primitives/size';
 import { Rect } from '../diagram/primitives/rect';
 import { IArrangeTickOptions } from './objects/interface/interfaces';
@@ -181,11 +181,10 @@ export class Ruler extends Component<HTMLElement> implements INotifyPropertyChan
         let rulerGeometry: Size = this.getRulerGeometry();
         let div: HTMLElement = document.getElementById(this.element.id + '_ruler_space');
         if (!div) {
-            div = document.createElement('div');
-            div.setAttribute('id', this.element.id + '_ruler_space');
-            div.style.height = rulerGeometry.height + 'px';
-            div.style.width = rulerGeometry.width + 'px';
-            div.style.cssFloat = 'left';
+            div = createHtmlElement('div', {
+                'id': this.element.id + '_ruler_space',
+                'style': 'height:' + rulerGeometry.height + 'px;width:' + rulerGeometry.width + 'px;cssFloat:' + 'left;'
+            });
             this.element.appendChild(div);
         }
         return div;

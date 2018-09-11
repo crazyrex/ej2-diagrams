@@ -18,6 +18,7 @@ import {
 import { MouseEvents } from '../diagram/interaction/mouseevents.spec';
 import { IElement, PointModel, TextElement, StackPanel, DiagramElement, randomId } from '../../src/diagram/index';
 import { EJ2Instance } from '@syncfusion/ej2-navigations';
+import { BpmnShapeModel, BpmnSubProcessModel } from "../../src/index";
 Diagram.Inject(BpmnDiagrams);
 SymbolPalette.Inject(BpmnDiagrams);
 Diagram.Inject(UndoRedo);
@@ -35,7 +36,7 @@ describe('Symbol Palette', () => {
         { id: 'end', shape: { type: 'Flow', shape: 'Terminator' } }];
 
         let bpmnShapes: NodeModel[] = [{
-            id: 'node2a', width: 100, height: 100, offsetX: 500, offsetY: 100,
+            id: 'node2a', width: 100, height: 100, offsetX: 500, offsetY: 100, constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
             shape: { type: 'Bpmn', shape: 'DataObject', dataObject: { collection: false, type: 'None' } }
         },
         {
@@ -44,6 +45,9 @@ describe('Symbol Palette', () => {
                 type: 'Bpmn', shape: 'Activity',
                 activity: { activity: 'SubProcess', subProcess: { type: 'Event' } }
             }
+        }, {
+            id: 'annot4', width: 100, height: 100,
+            shape: { type: 'Bpmn', shape: 'TextAnnotation', annotation: { angle: 280, length: 150, text: 'textAnnotation4', } }
         }];
 
         let connectorSymbols: ConnectorModel[] = [{
@@ -84,7 +88,7 @@ describe('Symbol Palette', () => {
         let svgNodes: NodeModel[] = [{
             id: 'native', width: 100, height: 100, shape: {
                 type: 'Native',
-                content: '<g><style xmlns=http://www.w3.org/2000/svg type=text/css>.st051{fill:#CBC4C9;}.st152{fill:#E5DCE1;}.st252{fill:#DBD5DA;}.st3552{fill:#69696B;}</style><g xmlns=http://www.w3.org/2000/svg>    <path class=st051 d=M2.8,37L18,44.3c5,2.4,10.8,2.3,15.6-0.3l13.6-7.3c1.7-0.9,2.3-5.6,1.9-7c0,0.1,0.1,0.3,0.1,0.4v-4.3   c0.1,1.6-0.8,3.1-2.3,3.7l0,0l-13.1-6.9c-5.5-2.9-12-2.9-17.5,0L3.2,29.8c-1.3-0.5-2.3-1.7-2.5-3.2v6.7 />    <path class=st152 d=M18.2,37.2l-15-7.3c-1.7-0.7-2.6-2.7-1.9-4.4c0.3-0.8,0.9-1.4,1.7-1.8l13.6-7.2c5.4-2.8,11.9-2.8,17.3,0   l13.2,7c1.7,0.8,2.5,2.9,1.7,4.6c-0.3,0.8-1,1.4-1.7,1.7L33.6,37C28.8,39.5,23.1,39.6,18.2,37.2z />    <path class=st252 d=M25.5,39.2c-2.7,0-5.3-0.6-7.7-1.8L2.6,30.1c-1.1-0.6-1.9-1.6-2.3-2.8l1-0.3C1.6,28,2.2,28.7,3,29.2l15.2,7.4   c4.8,2.3,10.5,2.2,15.2-0.3L47,29c0.9-0.5,1.6-1.4,1.8-2.4l1,0.1c-0.2,1.4-1.1,2.5-2.3,3.1l-13.7,7.3   C31.3,38.5,28.4,39.2,25.5,39.2z />    <path class=st3552 d=M26,46.1c-0.7,0-1.4,0-2.2-0.1c-2.3-0.3-4.6-1-6.8-2l-9.1-4.4L4.8,38H4.6c-1-0.4-1.9-1-2.7-1.8   c-0.7-0.8-1.2-1.8-1.5-2.8c-0.2-0.6-0.2-1.2-0.2-1.8V28l0,0c0,0,0-0.1,0-0.3c0.2-2.3,1.5-4.4,3.6-5.5l12.4-6.6c5.6-3,12.4-3,18-0.1   l13.3,7c1.5,1,2.4,2.7,2.3,4.5l-0.1,5.2c0,2.1-1.2,4-3.1,4.9L33,44.5C30.8,45.6,28.4,46.2,26,46.1z M25.2,14.3   c-3,0-5.9,0.7-8.6,2.1L4.2,23.1c-1.7,0.9-2.9,2.7-3,4.6c0,0.1,0,0.2,0,0.2v3.6c0,0.5,0.1,1,0.2,1.5C1.6,34,2,34.8,2.6,35.5   c0.7,0.7,1.5,1.2,2.4,1.6l0.2,0.1l3.2,1.5l9.1,4.4c2,1,4.2,1.6,6.5,1.9c2.9,0.4,5.9-0.1,8.6-1.4l13.7-7.3c1.5-0.8,2.5-2.3,2.5-4   l0.1-5.2c0.1-1.5-0.6-2.9-1.8-3.6l-13.3-7C31.1,15.1,28.2,14.3,25.2,14.3L25.2,14.3z />    <path class=st3552 d=M4,33.5c0,0.5-0.2,0.8-0.5,0.8S2.8,34,2.8,33.5s0.2-0.8,0.5-0.8S4,33,4,33.5z />    <path class=st3552 d=M7,35.1c0,0.5-0.2,0.8-0.5,0.8s-0.6-0.3-0.7-0.8s0.2-0.8,0.5-0.8S6.9,34.7,7,35.1z />    <path class=st3552 d=M9.9,36.7c0,0.5-0.2,0.8-0.5,0.8s-0.6-0.3-0.7-0.8s0.2-0.8,0.5-0.8S9.9,36.3,9.9,36.7z />    <path class=st3552 d=M17.6,40.2c0,0.6-0.3,1.1-0.7,1.1s-0.8-0.5-0.9-1.1s0.3-1.1,0.7-1.1S17.6,39.6,17.6,40.2z />    <path class=st3552 d=M32,15.2l0.4-12.7c0-0.6,0.5-1.1,1.1-1.1c0.2,0,0.3,0,0.5,0.1l0,0c0.4,0.2,0.6,0.5,0.6,0.9L35,16.5L32,15.2z /></g></g>',
+                content: '<g> ${id} <style xmlns=http://www.w3.org/2000/svg type=text/css>.st051{fill:#CBC4C9;}.st152{fill:#E5DCE1;}.st252{fill:#DBD5DA;}.st3552{fill:#69696B;}</style><g xmlns=http://www.w3.org/2000/svg>    <path class=st051 d=M2.8,37L18,44.3c5,2.4,10.8,2.3,15.6-0.3l13.6-7.3c1.7-0.9,2.3-5.6,1.9-7c0,0.1,0.1,0.3,0.1,0.4v-4.3   c0.1,1.6-0.8,3.1-2.3,3.7l0,0l-13.1-6.9c-5.5-2.9-12-2.9-17.5,0L3.2,29.8c-1.3-0.5-2.3-1.7-2.5-3.2v6.7 />    <path class=st152 d=M18.2,37.2l-15-7.3c-1.7-0.7-2.6-2.7-1.9-4.4c0.3-0.8,0.9-1.4,1.7-1.8l13.6-7.2c5.4-2.8,11.9-2.8,17.3,0   l13.2,7c1.7,0.8,2.5,2.9,1.7,4.6c-0.3,0.8-1,1.4-1.7,1.7L33.6,37C28.8,39.5,23.1,39.6,18.2,37.2z />    <path class=st252 d=M25.5,39.2c-2.7,0-5.3-0.6-7.7-1.8L2.6,30.1c-1.1-0.6-1.9-1.6-2.3-2.8l1-0.3C1.6,28,2.2,28.7,3,29.2l15.2,7.4   c4.8,2.3,10.5,2.2,15.2-0.3L47,29c0.9-0.5,1.6-1.4,1.8-2.4l1,0.1c-0.2,1.4-1.1,2.5-2.3,3.1l-13.7,7.3   C31.3,38.5,28.4,39.2,25.5,39.2z />    <path class=st3552 d=M26,46.1c-0.7,0-1.4,0-2.2-0.1c-2.3-0.3-4.6-1-6.8-2l-9.1-4.4L4.8,38H4.6c-1-0.4-1.9-1-2.7-1.8   c-0.7-0.8-1.2-1.8-1.5-2.8c-0.2-0.6-0.2-1.2-0.2-1.8V28l0,0c0,0,0-0.1,0-0.3c0.2-2.3,1.5-4.4,3.6-5.5l12.4-6.6c5.6-3,12.4-3,18-0.1   l13.3,7c1.5,1,2.4,2.7,2.3,4.5l-0.1,5.2c0,2.1-1.2,4-3.1,4.9L33,44.5C30.8,45.6,28.4,46.2,26,46.1z M25.2,14.3   c-3,0-5.9,0.7-8.6,2.1L4.2,23.1c-1.7,0.9-2.9,2.7-3,4.6c0,0.1,0,0.2,0,0.2v3.6c0,0.5,0.1,1,0.2,1.5C1.6,34,2,34.8,2.6,35.5   c0.7,0.7,1.5,1.2,2.4,1.6l0.2,0.1l3.2,1.5l9.1,4.4c2,1,4.2,1.6,6.5,1.9c2.9,0.4,5.9-0.1,8.6-1.4l13.7-7.3c1.5-0.8,2.5-2.3,2.5-4   l0.1-5.2c0.1-1.5-0.6-2.9-1.8-3.6l-13.3-7C31.1,15.1,28.2,14.3,25.2,14.3L25.2,14.3z />    <path class=st3552 d=M4,33.5c0,0.5-0.2,0.8-0.5,0.8S2.8,34,2.8,33.5s0.2-0.8,0.5-0.8S4,33,4,33.5z />    <path class=st3552 d=M7,35.1c0,0.5-0.2,0.8-0.5,0.8s-0.6-0.3-0.7-0.8s0.2-0.8,0.5-0.8S6.9,34.7,7,35.1z />    <path class=st3552 d=M9.9,36.7c0,0.5-0.2,0.8-0.5,0.8s-0.6-0.3-0.7-0.8s0.2-0.8,0.5-0.8S9.9,36.3,9.9,36.7z />    <path class=st3552 d=M17.6,40.2c0,0.6-0.3,1.1-0.7,1.1s-0.8-0.5-0.9-1.1s0.3-1.1,0.7-1.1S17.6,39.6,17.6,40.2z />    <path class=st3552 d=M32,15.2l0.4-12.7c0-0.6,0.5-1.1,1.1-1.1c0.2,0,0.3,0,0.5,0.1l0,0c0.4,0.2,0.6,0.5,0.6,0.9L35,16.5L32,15.2z /></g></g>',
                 text: 'Element for Network Diagram'
             } as NodeModel
         }];
@@ -139,16 +143,26 @@ describe('Symbol Palette', () => {
             document.body.appendChild(ele);
             let nodes: NodeModel[] = [
                 {
-                    id: 'node1', width: 100, height: 100, offsetX: 100, offsetY: 100,
-                    annotations: [{ content: 'Default Shape' }]
+                    id: 'nodea', maxHeight: 600, maxWidth: 600, minWidth: 300, minHeight: 300,
+                    constraints: NodeConstraints.Default | NodeConstraints.AllowDrop,
+                    offsetX: 200, offsetY: 200,
+                    shape: {
+                        type: 'Bpmn', shape: 'Activity', activity: {
+                            activity: 'SubProcess',
+                            subProcess: {
+                                collapsed: false, type: 'Transaction',
+                                //processes: ['start', 'end', 'nod1', 'nod']
+                            } as BpmnSubProcessModel
+                        },
+                    },
                 },
                 {
                     id: 'node2', width: 100, height: 100, offsetX: 300, offsetY: 100,
                     constraints: NodeConstraints.PointerEvents | NodeConstraints.Select,
                     shape: {
                         type: 'Path', data: 'M540.3643,137.9336L546.7973,159.7016L570.3633,159.7296L550.7723,171.9366' +
-                        'L558.9053,194.9966L540.3643,' +
-                        '179.4996L521.8223,194.9966L529.9553,171.9366L510.3633,159.7296L533.9313,159.7016L540.3643,137.9336z'
+                            'L558.9053,194.9966L540.3643,' +
+                            '179.4996L521.8223,194.9966L529.9553,171.9366L510.3633,159.7296L533.9313,159.7016L540.3643,137.9336z'
                     }, annotations: [{ content: 'Path Element' }]
                 }
             ];
@@ -331,7 +345,115 @@ describe('Symbol Palette', () => {
             expect(diagram.nodes.length).toBe(2);
             done();
         });
+        it('drag and drop annotation node', (done: Function) => {
+            palette.element['ej2_instances'][1]['helper'] = (e: { target: HTMLElement, sender: PointerEvent | TouchEvent }) => {
+                let clonedElement: HTMLElement; let diagramElement: EJ2Instance;
+                let position: PointModel = palette['getMousePosition'](e.sender);
+                let target = document.elementFromPoint(position.x, position.y).childNodes[0];
+                let symbols: IElement = palette.symbolTable[target['id']];
+                palette['selectedSymbols'] = symbols;
+                if (symbols !== undefined) {
+                    clonedElement = palette['getSymbolPreview'](symbols, e.sender, palette.element);
+                    clonedElement.setAttribute('paletteId', palette.element.id);
+                }
+                return clonedElement;
+            };
+            diagram.dragEnter = (arg) => {
+                expect(arg.source instanceof SymbolPalette).toBe(true);
+                done();
+            }
+            diagram.dragOver = (arg) => {
+                expect(arg.diagram !== undefined).toBe(true);
+                done();
+            }
+            diagram.drop = (arg) => {
+                expect((arg.element as NodeModel).id === diagram.currentSymbol.id).toBe(true);
+                done();
+            }
+            let events: MouseEvents = new MouseEvents();
+            events.mouseDownEvent(palette.element, 175, 350, false, false);
+            events.mouseMoveEvent(palette.element, 100, 350, false, false);
+            events.mouseMoveEvent(palette.element, 200, 200, false, false);
+            expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
+            events.mouseMoveEvent(diagram.element, 300, 300, false, false);
+            events.mouseUpEvent(diagram.element, 300, 300, false, false);
+            expect(diagram.nodes.length).toBe(3);
+            diagram.undo();
+            expect(diagram.nodes.length).toBe(2);
+            diagram.redo(); diagram.undo();
 
+
+            events.mouseDownEvent(palette.element, 75, 350, false, false);
+            events.mouseMoveEvent(palette.element, 100, 350, false, false);
+            events.mouseMoveEvent(palette.element, 300, 200, false, false);
+            expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
+            events.mouseMoveEvent(diagram.element, 300, 300, false, false);
+            events.mouseUpEvent(diagram.element, 300, 300, false, false);
+
+            events.mouseDownEvent(palette.element, 175, 350, false, false);
+            events.mouseMoveEvent(palette.element, 100, 350, false, false);
+            events.mouseMoveEvent(palette.element, 200, 200, false, false);
+            expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
+            events.mouseMoveEvent(diagram.element, 300, 300, false, false);
+            events.mouseUpEvent(diagram.element, 300, 300, false, false);
+            expect(diagram.nodes.length).toBe(4);
+            diagram.undo();
+            expect(diagram.nodes.length).toBe(3);
+            diagram.redo(); diagram.undo();
+            done();
+        });
+        it('drag and drop annotation processes', (done: Function) => {
+            
+            palette.element['ej2_instances'][1]['helper'] = (e: { target: HTMLElement, sender: PointerEvent | TouchEvent }) => {
+                let clonedElement: HTMLElement; let diagramElement: EJ2Instance;
+                let position: PointModel = palette['getMousePosition'](e.sender);
+                let target = document.elementFromPoint(position.x, position.y).childNodes[0];
+                let symbols: IElement = palette.symbolTable[target['id']];
+                palette['selectedSymbols'] = symbols;
+                if (symbols !== undefined) {
+                    clonedElement = palette['getSymbolPreview'](symbols, e.sender, palette.element);
+                    clonedElement.setAttribute('paletteId', palette.element.id);
+                }
+                return clonedElement;
+            };
+            diagram.dragEnter = (arg) => {
+                expect(arg.source instanceof SymbolPalette).toBe(true);
+                done();
+            }
+            diagram.dragOver = (arg) => {
+                expect(arg.diagram !== undefined).toBe(true);
+                done();
+            }
+            diagram.drop = (arg) => {
+                expect((arg.element as NodeModel).id === diagram.currentSymbol.id).toBe(true);
+                done();
+            }
+
+            let events: MouseEvents = new MouseEvents();
+            events.mouseDownEvent(palette.element, 50, 325, false, false);
+            events.mouseMoveEvent(palette.element, 100, 350, false, false);
+            events.mouseMoveEvent(palette.element, 200, 200, false, false);
+            expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
+            events.mouseMoveEvent(diagram.element, 400, 250, false, false);
+            var diagramCanvas = document.getElementById(diagram.element.id + 'content');
+            events.mouseUpEvent(diagram.element, 400, 250, false, false);
+            expect(diagram.nodes.length).toBe(4);
+
+            diagram.undo()
+            expect(diagram.nodes.length).toBe(3);
+            done();
+            diagram.add({
+                id: 'annot2', width: 100, height: 100, shape: { shape: 'TextAnnotation', type: 'Bpmn', annotation: { text: 'textAnnotation2' } }
+            });
+            diagram.select([diagram.nameTable['annot2']]);
+            diagram.copy();
+            diagram.paste();
+            diagram.undo();
+            diagram.undo();
+            expect(diagram.nodes.length).toBe(3);
+            done();
+
+        });
         it('Checking drag stop', (done: Function) => {
             let events: MouseEvents = new MouseEvents();
             events.mouseDownEvent(palette.element, 75, 100, false, false);
@@ -393,7 +515,7 @@ describe('Symbol Palette', () => {
             events.mouseMoveEvent(diagram.element, 500, 300, false, false);
             events.mouseUpEvent(diagram.element, 500, 300, false, false);
             expect(document.getElementsByClassName('e-dragclone').length == 0).toBe(true);
-            expect(diagram.nodes.length).toBe(3);
+            expect(diagram.nodes.length).toBe(4);
             done();
         });
 
@@ -419,7 +541,7 @@ describe('Symbol Palette', () => {
             events.mouseUpEvent(diagram.element, 500, 300, false, false);
             expect(diagram.connectors.length).toBe(2);
             expect(Math.round(diagram.connectors[1].wrapper.offsetX) == 180 || Math.round(diagram.connectors[1].wrapper.offsetX) == 176 ||
-                diagram.connectors[1].wrapper.offsetX == 154.5 ||
+                diagram.connectors[1].wrapper.offsetX == 154.5 || diagram.connectors[1].wrapper.offsetX === 304.5||
                 diagram.connectors[1].wrapper.offsetX == 309 || Math.round(diagram.connectors[1].wrapper.offsetX) == 303 ||
                 Math.round(diagram.connectors[1].wrapper.offsetX) == 304 ||
                 Math.round(diagram.connectors[1].wrapper.offsetX) == 300).toBe(true);
@@ -445,6 +567,10 @@ describe('Symbol Palette', () => {
             events.mouseMoveEvent(palette.element, 100, 100, false, false);
             events.mouseMoveEvent(palette.element, 200, 200, false, false);
             expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
+            let nativeElement = document.getElementById('native_content_native_element').childNodes[0];
+            let element = nativeElement.childNodes[0];
+            let string: string = element.textContent; string = string.slice(1, 7);
+            expect(string == 'native').toBe(true);
             events.mouseMoveEvent(diagram.element, 500, 300, false, false);
             events.mouseUpEvent(diagram.element, 500, 300, false, false);
             expect(diagram.connectors.length).toBe(2);
@@ -780,6 +906,24 @@ describe('Symbol Palette', () => {
             expect(document.getElementsByClassName('e-dragclone').length > 0).toBe(true);
             events.mouseUpEvent(palette.element, 200, 200, false, false);
             expect(document.getElementsByClassName('e-dragclone').length == 0).toBe(true);
+            done();
+        });
+
+        it('Refresh palettes at runtime', (done: Function) => {
+            palette.palettes = [
+                {
+                    id: 'BPMN', symbols: [
+                        {
+                            id: 'BPMNStart', style: { strokeWidth: 2 }, shape: { type: 'Bpmn', shape: 'Event', event: { event: 'Start', trigger: 'None' } },
+                        },
+                        {
+                            id: 'Intermediate', style: { strokeWidth: 2 }, shape: { type: 'Bpmn', shape: 'Event', event: { event: 'Intermediate', trigger: 'None' } },
+                        }
+                    ], title: 'BPMN'
+                }
+            ];
+            palette.dataBind()
+            expect(palette.palettes.length === 1).toBe(true);
             done();
         });
     });

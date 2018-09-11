@@ -45,7 +45,7 @@ let data: object[] = [
 let items: DataManager = new DataManager(data as JSON[], new Query().take(7));
 
 let diagram: Diagram = new Diagram({
-    width: '100%', height: '550px',
+    width: '900px', height: '550px',
     layout: { type: 'HierarchicalTree' },
     dataSourceSettings: { id: 'id', parentId: 'parentId', dataManager: items },
     getNodeDefaults: (obj: Node) => {

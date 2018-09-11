@@ -18,7 +18,7 @@ export interface NodeBaseModel {
     zIndex?: number;
 
     /**
-     * Defines the space to be let between the node and its immediate parent
+     * Defines the space to be left between the node and its immediate parent
      * @default {}
      */
     margin?: MarginModel;
@@ -37,7 +37,7 @@ export interface NodeBaseModel {
     ports?: PointPortModel[];
 
     /**
-     * Defines if the node is expanded or not
+     * Defines whether the node is expanded or not
      * @default true
      */
     isExpanded?: boolean;
@@ -49,19 +49,19 @@ export interface NodeBaseModel {
     tooltip?: DiagramTooltipModel;
 
     /**
-     * Defines the properties of the Expand Icon
+     * Defines the expanded state of a node
      * @default {}
      */
     expandIcon?: IconShapeModel;
 
     /**
-     * Defines the properties of the collapse Icon
+     * Defines the collapsed state of a node
      * @default {}
      */
     collapseIcon?: IconShapeModel;
 
     /**
-     * Defines whether the node should be automatically positioned or not
+     * Defines whether the node should be automatically positioned or not. Applicable, if layout option is enabled.
      * @default false
      */
     excludeFromLayout?: boolean;

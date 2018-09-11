@@ -13,6 +13,7 @@ import { DiagramHtmlElement } from '../core/elements/html-element';
 import { DiagramNativeElement } from '../core/elements/native-element';
 import { BaseAttributes, TextAttributes, SubTextElement, TextBounds } from '../rendering/canvas-interface';
 import { getElement } from './diagram-util';
+
 /**
  * Defines the functionalities that need to access DOM
  */
@@ -38,7 +39,6 @@ export function findSegmentPoints(element: PathElement): PointModel[] {
     return pts;
 
 }
-
 export function getChildNode(node: SVGElement): SVGElement[] | HTMLCollection {
     let child: SVGElement;
     let collection: SVGElement[] | HTMLCollection = [];
@@ -54,7 +54,6 @@ export function getChildNode(node: SVGElement): SVGElement[] | HTMLCollection {
     }
     return collection;
 }
-
 export function translatePoints(element: PathElement, points: PointModel[]): PointModel[] {
     let translatedPts: PointModel[] = [];
     for (let point of points) {
@@ -111,6 +110,7 @@ function getTextOptions(element: TextElement, maxWidth?: number): BaseAttributes
     (options as TextAttributes).doWrap = element.doWrap;
     (options as TextAttributes).whiteSpace = whiteSpaceToString(element.style.whiteSpace, element.style.textWrapping);
     (options as TextAttributes).content = element.content;
+    (options as TextAttributes).textWrapping = element.style.textWrapping;
     (options as TextAttributes).breakWord = wordBreakToString(element.style.textWrapping);
     (options as TextAttributes).textAlign = textAlignToString(element.style.textAlign);
     (options as TextAttributes).color = element.style.color;
@@ -170,7 +170,7 @@ function wordWrapping(text: TextAttributes, textValue?: string): SubTextElement[
     let existingText: string;
     for (j = 0; j < eachLine.length; j++) {
         txt = '';
-        words = eachLine[j].split(' ');
+        words = text.textWrapping !== 'NoWrap' ? eachLine[j].split(' ') : eachLine;
         for (i = 0; i < words.length; i++) {
             txtValue += (((i !== 0 || words.length === 1) && wrap && txtValue.length > 0) ? ' ' : '') + words[i];
             newText = txtValue + (words[i + 1] || '');
@@ -214,7 +214,7 @@ function wrapSvgTextAlign(text: TextAttributes, childNodes: SubTextElement[]): T
         } else {
             txtWidth = childNodes.length > 1 ? 0 : -txtWidth / 2;
         }
-        childNodes[k].dy = text.fontSize;
+        childNodes[k].dy = text.fontSize * 1.2;
         childNodes[k].x = txtWidth;
         if (!wrapBounds) {
             wrapBounds = {
@@ -231,9 +231,7 @@ function wrapSvgTextAlign(text: TextAttributes, childNodes: SubTextElement[]): T
 
 export function measureHtmlText(style: TextStyleModel, content: string, width: number, height: number, maxWidth?: number): Size {
     let bounds: Size = new Size();
-    let text: HTMLElement = document.createElement('Span');
-    text.setAttribute('style', 'display:inline-block ; line-height: normal');
-
+    let text: HTMLElement = createHtmlElement('span', { 'style': 'display:inline-block; line-height: normal' });
     if (style.bold) {
         text.style.fontWeight = 'bold';
     }
@@ -360,8 +358,10 @@ export function getDiagramLayerSvg(diagramId: string): SVGSVGElement {
 }
 
 /** @private */
-export function getDiagramElement(diagramId: string): HTMLElement {
-    let diagramElement: HTMLElement = document.getElementById(diagramId);
+export function getDiagramElement(elementId: string, contentId?: string): HTMLElement {
+    let diagramElement: HTMLElement; let element: HTMLElement;
+    if (contentId) { element = document.getElementById(contentId); }
+    diagramElement = (element) ? element.querySelector('#' + elementId) as HTMLElement : document.getElementById(elementId);
     return diagramElement;
 }
 
@@ -395,13 +395,13 @@ export function getAdornerLayer(diagramId: string): SVGElement {
     return adornerLayer;
 }
 
-/** @private */
-export function getDiagramLayer(diagramId: string): SVGElement {
-    let diagramLayer: SVGElement;
-    let diagramLayerSvg: SVGSVGElement = getDiagramLayerSvg(diagramId);
-    diagramLayer = diagramLayerSvg.getElementById(diagramId + '_diagramLayer') as SVGElement;
-    return diagramLayer;
-}
+// /** @private */
+// export function getDiagramLayer(diagramId: string): SVGElement {
+//     let diagramLayer: SVGElement;
+//     let diagramLayerSvg: SVGSVGElement = getDiagramLayerSvg(diagramId);
+//     diagramLayer = diagramLayerSvg.getElementById(diagramId + '_diagramLayer') as SVGElement;
+//     return diagramLayer;
+// }
 
 /** @private */
 export function getPortLayerSvg(diagramId: string): SVGSVGElement {
@@ -468,21 +468,21 @@ export function getGridLayer(diagramId: string): SVGElement {
     return expandCollapse;
 }
 
-/** @private */
-export function getExpandCollapseLayer(diagramId: string): SVGElement {
-    let expandCollapse: SVGElement = null;
-    let diagramPortSvg: SVGSVGElement = getPortLayerSvg(diagramId);
-    expandCollapse = diagramPortSvg.getElementById(diagramId + '_diagramExpander') as SVGElement;
-    return expandCollapse;
-}
+// /** @private */
+// export function getExpandCollapseLayer(diagramId: string): SVGElement {
+//     let expandCollapse: SVGElement = null;
+//     let diagramPortSvg: SVGSVGElement = getPortLayerSvg(diagramId);
+//     expandCollapse = diagramPortSvg.getElementById(diagramId + '_diagramExpander') as SVGElement;
+//     return expandCollapse;
+// }
 
-/** @private */
-export function getPortsLayer(diagramId: string): SVGElement {
-    let expandCollapse: SVGElement = null;
-    let diagramPortSvg: SVGSVGElement = getPortLayerSvg(diagramId);
-    expandCollapse = diagramPortSvg.getElementById(diagramId + '_diagramPorts') as SVGElement;
-    return expandCollapse;
-}
+// /** @private */
+// export function getPortsLayer(diagramId: string): SVGElement {
+//     let expandCollapse: SVGElement = null;
+//     let diagramPortSvg: SVGSVGElement = getPortLayerSvg(diagramId);
+//     expandCollapse = diagramPortSvg.getElementById(diagramId + '_diagramPorts') as SVGElement;
+//     return expandCollapse;
+// }
 
 /** @private */
 export function getNativeLayer(diagramId: string): SVGElement {
@@ -504,7 +504,7 @@ export function getHTMLLayer(diagramId: string): HTMLElement {
 
 /** @private */
 export function createHtmlElement(elementType: string, attribute: Object): HTMLElement {
-    let element: HTMLElement = document.createElement(elementType);
+    let element: HTMLElement = createElement(elementType);
     setAttributeHtml(element, attribute);
     return element;
 }
@@ -535,17 +535,14 @@ export function hasClass(element: HTMLElement, className: string): boolean {
 }
 /** @hidden */
 export function getScrollerWidth(): number {
-    let outer: HTMLElement = document.createElement('div');
-    outer.style.visibility = 'hidden';
-    outer.style.width = '100px';
+    let outer: HTMLElement = createHtmlElement('div', { 'style': 'visibility:hidden; width: 100px' });
     document.body.appendChild(outer);
     let widthNoScroll: number = outer.getBoundingClientRect().width;
     // force scrollbars
     outer.style.overflow = 'scroll';
 
     // add innerdiv
-    let inner: HTMLElement = document.createElement('div');
-    inner.style.width = '100%';
+    let inner: HTMLElement = createHtmlElement('div', { 'style': 'width:100%' });
     outer.appendChild(inner);
 
     let widthWithScroll: number = inner.getBoundingClientRect().width;
@@ -576,9 +573,7 @@ export function addTouchPointer(touchList: ITouches[], e: PointerEvent, touches:
  * @param elementId
  */
 export function removeElement(elementId: string, contentId?: string): void {
-    let element: HTMLElement = document.getElementById(contentId);
-    let div: HTMLElement = (contentId && element) ? document.getElementById(contentId).querySelector('#' + elementId) as HTMLElement :
-        document.getElementById(elementId);
+    let div: HTMLElement = getDiagramElement(elementId, contentId);
     if (div) {
         div.parentNode.removeChild(div);
     }
@@ -627,12 +622,14 @@ export function setAttributeHtml(element: HTMLElement, attributes: Object): void
 export function createMeasureElements(): void {
     let measureElement: string = 'measureElement';
     if (!window[measureElement]) {
-        let divElement: HTMLElement = createElement('div', { id: 'measureElement', styles: 'visibility:hidden' });
-        let text: HTMLElement = document.createElement('Span');
-        text.setAttribute('style', 'display:inline-block ; line-height: normal');
+        let divElement: HTMLElement = createHtmlElement('div', {
+            id: 'measureElement',
+            style: 'visibility:hidden ; height: 0px ; width: 0px'
+        });
+        let text: HTMLElement = createHtmlElement('span', { 'style': 'display:inline-block ; line-height: normal' });
         divElement.appendChild(text);
         let imageElement: HTMLImageElement;
-        imageElement = document.createElement('img');
+        imageElement = createHtmlElement('img', {}) as HTMLImageElement;
         divElement.appendChild(imageElement);
 
         let svg: SVGSVGElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

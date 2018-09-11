@@ -1,12 +1,13 @@
 import { L10n } from '@syncfusion/ej2-base';
-import { createElement, remove } from '@syncfusion/ej2-base';
+import { remove } from '@syncfusion/ej2-base';
 import { ContextMenu as Menu, MenuItemModel } from '@syncfusion/ej2-navigations';
 import { ServiceLocator } from './service';
-import { MenuEventArgs, BeforeOpenCloseMenuEventArgs, OpenCloseMenuEventArgs } from '@syncfusion/ej2-navigations';
+import { BeforeOpenCloseMenuEventArgs, OpenCloseMenuEventArgs } from '@syncfusion/ej2-navigations';
 import { Diagram } from '../diagram';
 import { contextMenuClick, contextMenuOpen } from '../enum/enum';
-import { ContextMenuItemModel } from './interface/interfaces';
-import { DiagramBeforeMenuOpenEventArgs } from '../../../src/diagram/objects/interface/interfaces';
+import { ContextMenuItemModel, DiagramMenuEventArgs } from './interface/interfaces';
+import { DiagramBeforeMenuOpenEventArgs } from '../../diagram/objects/interface/interfaces';
+import { createHtmlElement } from '../../diagram/utility/dom-util';
 
 /**
  * @private
@@ -105,7 +106,7 @@ export class DiagramContextMenu {
 
     private render(): void {
         this.l10n = this.serviceLocator.getService<L10n>('localization');
-        this.element = createElement('ul', { id: this.parent.element.id + '_contextMenu' }) as HTMLUListElement;
+        this.element = createHtmlElement('ul', { id: this.parent.element.id + '_contextMenu' }) as HTMLUListElement;
         this.parent.element.appendChild(this.element);
         let target: string = '#' + this.parent.element.id;
         this.contextMenu = new Menu({
@@ -166,48 +167,50 @@ export class DiagramContextMenu {
     private contextMenuOpen(): void {
         this.isOpen = true;
     }
-    private contextMenuItemClick(args: MenuEventArgs): void {
-        let item: string = this.getKeyFromId(args.item.id);
-        switch (item) {
-            case 'cut':
-                this.parent.cut();
-                break;
-            case 'copy':
-                this.parent.copy();
-                break;
-            case 'undo':
-                this.parent.undo();
-                break;
-            case 'redo':
-                this.parent.redo();
-                break;
-            case 'paste':
-                this.parent.paste();
-                break;
-            case 'selectAll':
-                this.parent.selectAll();
-                break;
-            case 'group':
-                this.parent.group();
-                break;
-            case 'unGroup':
-                this.parent.unGroup();
-                break;
-            case 'bringToFrontOrder':
-                this.parent.bringToFront();
-                break;
-            case 'moveForwardOrder':
-                this.parent.moveForward();
-                break;
-            case 'sendToBackOrder':
-                this.parent.sendToBack();
-                break;
-            case 'sendBackwardOrder':
-                this.parent.sendBackward();
-                break;
-        }
+    private contextMenuItemClick(args: DiagramMenuEventArgs): void {
         document.getElementById(this.parent.element.id + 'content').focus();
         this.parent.trigger(contextMenuClick, args);
+        let item: string = this.getKeyFromId(args.item.id);
+        if (!args.cancel) {
+            switch (item) {
+                case 'cut':
+                    this.parent.cut();
+                    break;
+                case 'copy':
+                    this.parent.copy();
+                    break;
+                case 'undo':
+                    this.parent.undo();
+                    break;
+                case 'redo':
+                    this.parent.redo();
+                    break;
+                case 'paste':
+                    this.parent.paste();
+                    break;
+                case 'selectAll':
+                    this.parent.selectAll();
+                    break;
+                case 'group':
+                    this.parent.group();
+                    break;
+                case 'unGroup':
+                    this.parent.unGroup();
+                    break;
+                case 'bringToFrontOrder':
+                    this.parent.bringToFront();
+                    break;
+                case 'moveForwardOrder':
+                    this.parent.moveForward();
+                    break;
+                case 'sendToBackOrder':
+                    this.parent.sendToBack();
+                    break;
+                case 'sendBackwardOrder':
+                    this.parent.sendBackward();
+                    break;
+            }
+        }
     }
 
     private contextMenuOnClose(args: OpenCloseMenuEventArgs): void {
@@ -258,7 +261,12 @@ export class DiagramContextMenu {
         } else {
             this.hiddenItems = this.hiddenItems.concat(diagramArgs.hiddenItems);
             this.contextMenu.enableItems(this.disableItems, false, true);
-            this.contextMenu.hideItems(this.hiddenItems, true);
+            let contextItems: DiagramContextMenu = this;
+            args.items.forEach((item: MenuItemModel) => {
+                if (contextItems.hiddenItems.indexOf(item.id) > -1) {
+                    contextItems.contextMenu.hideItems([item.id], true);
+                }
+            });
         }
     }
 

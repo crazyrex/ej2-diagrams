@@ -72,7 +72,43 @@ export class Decorator extends ChildProperty<Decorator> {
 
     /**
      * Sets the shape of the decorator
+     * * None - Sets the decorator shape as None
+     * * Arrow - Sets the decorator shape as Arrow
+     * * Diamond - Sets the decorator shape as Diamond
+     * * Path - Sets the decorator shape as Path
+     * * OpenArrow - Sets the decorator shape as OpenArrow
+     * * Circle - Sets the decorator shape as Circle
+     * * Square - Sets the decorator shape as Square
+     * * Fletch - Sets the decorator shape as Fletch
+     * * OpenFetch - Sets the decorator shape as OpenFetch
+     * * IndentedArrow - Sets the decorator shape as Indented Arrow
+     * * OutdentedArrow - Sets the decorator shape as Outdented Arrow
+     * * DoubleArrow - Sets the decorator shape as DoubleArrow
      * @default 'Arrow'
+     */
+    /**
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourcePoint: { x: 500, y: 100 }, targetPoint: { x: 600, y: 200 },
+     *   sourceDecorator: {
+     *    style: { fill: 'black' },
+     *    shape: 'Arrow',
+     *    pivot: { x: 0, y: 0.5 }},
+     *   targetDecorator: {
+     *    shape: 'Diamond',
+     *    style: { fill: 'blue' },
+     *    pivot: { x: 0, y: 0.5 }}
+     *  },];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     @Property('Arrow')
     public shape: DecoratorShapes;
@@ -98,16 +134,19 @@ export class Decorator extends ChildProperty<Decorator> {
     public pathData: string;
 
 }
+/**
+ * Describes the length and angle between the control point and the start point of bezier segment
+ */
 export class Vector extends ChildProperty<Vector> {
     /**
-     * Defines the angle for the bezier curve
+     * Defines the angle between the connector end point and control point of the bezier segment
      * @default 0
      */
     @Property(0)
     public angle: number;
 
     /**
-     * Defines the distance for the bezier curve
+     * Defines the distance between the connector end point and control point of the bezier segment
      * @default 0
      */
     @Property(0)
@@ -121,7 +160,8 @@ export class Vector extends ChildProperty<Vector> {
 export class ConnectorShape extends ChildProperty<ConnectorShape> {
 
     /**
-     * Defines the type of node shape
+     * Defines the application specific type of connector
+     * * Bpmn - Sets the type of the connection shape as Bpmn
      * @default 'None'
      */
     @Property('None')
@@ -129,17 +169,23 @@ export class ConnectorShape extends ChildProperty<ConnectorShape> {
 }
 
 /**
- * Sets the type of the Bpmn flows
+ * Sets the type of the flow in a BPMN Process
  */
 export class BpmnFlow extends ConnectorShape {
     /**
      * Sets the type of the Bpmn flows
+     * * Sequence - Sets the type of the Bpmn Flow as Sequence
+     * * Association - Sets the type of the Bpmn Flow as Association
+     * * Message - Sets the type of the Bpmn Flow as Message
      * @default 'Sequence'
      */
     @Property('Sequence')
     public flow: BpmnFlows;
     /**
      * Sets the type of the Bpmn Sequence flows
+     * * Default - Sets the type of the sequence flow as Default
+     * * Normal - Sets the type of the sequence flow as Normal
+     * * Conditional - Sets the type of the sequence flow as Conditional
      * @default 'Normal'
      */
     @Property('Normal')
@@ -147,23 +193,61 @@ export class BpmnFlow extends ConnectorShape {
 
     /**
      * Sets the type of the Bpmn message flows
+     * * Default - Sets the type of the Message flow as Default
+     * * InitiatingMessage - Sets the type of the Message flow as InitiatingMessage
+     * * NonInitiatingMessage - Sets the type of the Message flow as NonInitiatingMessage
      * @default ''
+     */
+    /**
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let nodes: NodeModel[] = [
+     * {
+     *   id: 'node1', width: 60, height: 60, offsetX: 75, offsetY: 90,
+     *   shape: { type: 'Bpmn', shape: 'Event', event: { event: 'Start', trigger: 'Message' } },
+     *     },
+     * {
+     *   id: 'node2', width: 75, height: 70, offsetX: 210, offsetY: 90,
+     *   shape: { type: 'Bpmn', shape: 'Gateway', gateway: { type: 'None' } },
+     *  }];
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourceID: 'node1', targetID: 'node2',
+     *   shape: { type: 'Bpmn', flow: 'Message', message: 'InitiatingMessage' } as BpmnFlowModel
+     *  },];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * nodes: nodes, connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     @Property('Default')
     public message: BpmnMessageFlows;
 
     /**
      * Sets the type of the Bpmn association flows
+     * * Default - Sets the type of Association flow as Default
+     * * Directional - Sets the type of Association flow as Directional
+     * * BiDirectional - Sets the type of Association flow as BiDirectional
      * @default ''
      */
     @Property('Default')
     public association: BpmnAssociationFlows;
 }
 
+/**
+ * Defines the behavior of connector segments
+ */
 export class ConnectorSegment extends ChildProperty<ConnectorSegment> {
 
     /**
-     * Defines the type of the connector
+     * Defines the type of the segment
+     * * Straight - Sets the segment type as Straight
+     * * Orthogonal - Sets the segment type as Orthogonal
+     * * Bezier - Sets the segment type as Bezier
      * @default 'Straight'
      */
     @Property('Straight')
@@ -186,6 +270,9 @@ export class ConnectorSegment extends ChildProperty<ConnectorSegment> {
     }
 }
 
+/**
+ * Defines the behavior of straight segments
+ */
 export class StraightSegment extends ConnectorSegment {
 
     /**
@@ -196,6 +283,9 @@ export class StraightSegment extends ConnectorSegment {
     public point: PointModel;
 }
 
+/**
+ * Defines the behavior of bezier segments
+ */
 export class BezierSegment extends StraightSegment {
 
     /**
@@ -212,38 +302,64 @@ export class BezierSegment extends StraightSegment {
 
     /**
      * Sets the first control point of the connector
-     * @default new Point(0,0)
+     * @default {}
      */
     @Complex<PointModel>({ x: 0, y: 0 }, Point)
     public point1: PointModel;
 
     /**
      * Sets the second control point of the connector
-     * @default new Point(0,0)
+     * @default {}
      */
     @Complex<PointModel>({ x: 0, y: 0 }, Point)
     public point2: PointModel;
 
     /**
-     * Defines the first vector point of the bezier connector
-     * @default new Vector()
+     * Defines the length and angle between the source point and the first control point of the diagram
+     * @default {}
      */
     @Complex<VectorModel>({ angle: 0, distance: 0 }, Vector)
     public vector1: VectorModel;
 
     /**
-     * Defines the second vector point of the bezier connector
-     * @default new Vector()
+     * Defines the length and angle between the target point and the second control point of the diagram
+     * @default {}
      */
     @Complex<VectorModel>({ angle: 0, distance: 0 }, Vector)
     public vector2: VectorModel;
 
 }
 
+/**
+ * Defines the behavior of orthogonal segments
+ */
 export class OrthogonalSegment extends ConnectorSegment {
 
     /**
      * Defines the length of orthogonal segment
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *       id: 'link2', sourcePoint: { x: 0, y: 0 }, targetPoint: { x: 40, y: 40 }, type: 'Orthogonal',
+     *       shape: {
+     *           type: 'Bpmn',
+     *           flow: 'Message',
+     *           association: 'directional'
+     *       }, style: {
+     *           strokeDashArray: '2,2'
+     *       },
+     *       segments: [{ type: 'Orthogonal', length: 30, direction: 'Bottom' },
+     *       { type: 'Orthogonal', length: 80, direction: 'Right' }]
+     *   }];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      * @default 0
      */
     @Property(null)
@@ -251,6 +367,10 @@ export class OrthogonalSegment extends ConnectorSegment {
 
     /**
      * Sets the direction of orthogonal segment
+     * * Left - Sets the direction type as Left
+     * * Right - Sets the direction type as Right
+     * * Top - Sets the direction type as Top
+     * * Bottom - Sets the direction type as Bottom
      * @default null
      */
     @Property(null)
@@ -397,6 +517,21 @@ export class Connector extends NodeBase implements IElement {
 
     /**
      * Defines the constraints of connector
+     * * None - Interaction of the connectors cannot be done.
+     * * Select - Selects the connector.
+     * * Delete - Delete the connector.
+     * * Drag - Drag the connector.
+     * * DragSourceEnd - Drag the source end of the connector.
+     * * DragTargetEnd - Drag the target end of the connector.
+     * * DragSegmentThump - Drag the segment thumb of the connector.
+     * * AllowDrop - Allow to drop a node.
+     * * Bridging - Creates bridge  on intersection of two connectors.
+     * * InheritBridging - Creates bridge  on intersection of two connectors.
+     * * PointerEvents - Sets the pointer events.
+     * * Tooltip - Displays a tooltip for the connectors.
+     * * InheritToolTip - Displays a tooltip for the connectors.
+     * * Interaction - Features of the connector used for interaction.
+     * * ReadOnly - Enables ReadOnly
      * @default 'None'
      * @aspNumberEnum 
      */
@@ -413,6 +548,24 @@ export class Connector extends NodeBase implements IElement {
      * Defines the collection of textual annotations of connectors
      * @aspDefaultValueIgnore
      * @default undefined
+     */
+
+    /**
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let connectors: ConnectorModel[] = [{
+     *   id: 'connector', type: 'Straight', sourcePoint: { x: 500, y: 100 }, targetPoint: { x: 600, y: 200 },
+     * annotations: [{ content: 'No', offset: 0, alignment: 'After' }]
+     * ];
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * connectors: connectors
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * ```
      */
     @Collection<PathAnnotationModel>([], PathAnnotation)
     public annotations: PathAnnotationModel[];
@@ -463,6 +616,9 @@ export class Connector extends NodeBase implements IElement {
 
     /**
      * Defines the type of the connector
+     * * Straight - Sets the segment type as Straight
+     * * Orthogonal - Sets the segment type as Orthogonal
+     * * Bezier - Sets the segment type as Bezier
      * @default 'Straight'
      */
     @Property('Straight')
@@ -720,8 +876,11 @@ export class Connector extends NodeBase implements IElement {
         let textele: TextElement = new TextElement();
         textele.constraints = annotation.constraints;
         textele.visible = annotation.visibility;
+        textele.rotateAngle = annotation.rotateAngle;
         textele.horizontalAlignment = annotation.horizontalAlignment;
         textele.verticalAlignment = annotation.verticalAlignment;
+        textele.width = annotation.width;
+        textele.height = annotation.height;
         if (bounds.width !== undefined) {
             textele.width = (annotation.width || bounds.width) - annotation.margin.left - annotation.margin.right;
         }
@@ -747,11 +906,14 @@ export class Connector extends NodeBase implements IElement {
         let getPointloop: SegmentInfo;
         let newPoint: PointModel; let align: Alignment; let hAlign: string;
         let vAlign: string; let offsetPoint: PointModel; let pivotPoint: PointModel = { x: 0, y: 0 };
-        annotation.margin = { left: 0, right: 0, top: 0, bottom: 0 };
         textElement.refreshTextElement();
-        textElement.width = (annotation.width || bounds.width) - textElement.margin.left - textElement.margin.right;
+        textElement.width = (annotation.width || bounds.width);
         getPointloop = getAnnotationPosition(points, annotation, bounds);
         newPoint = getPointloop.point;
+        if (annotation.segmentAngle) {
+            textElement.rotateAngle = annotation.rotateAngle + getPointloop.angle;
+            textElement.rotateAngle = (textElement.rotateAngle + 360) % 360;
+        }
         if (bounds.width === 0) { bounds.width = this.style.strokeWidth; }
         if (bounds.height === 0) { bounds.height = this.style.strokeWidth; }
         offsetPoint = { x: ((newPoint.x - bounds.x) / bounds.width), y: ((newPoint.y - bounds.y) / bounds.height) };

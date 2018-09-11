@@ -132,15 +132,6 @@ describe('Diagram Control', () => {
             expect(diagram != null && diagram.commands !== null).toBe(true);
             done();
         });
-        it('Checking before, after, save diagram with selected nodes', (done: Function) => {
-            let selArray: (NodeModel | ConnectorModel)[] = [];
-            selArray.push(diagram.nodes[0]);
-            diagram.select(selArray);
-            savedata = diagram.saveDiagram();
-            diagram.loadDiagram(savedata);
-            expect(savedata != null).toBe(true);
-            done();
-        });
         it('Checking before, after, customProperties', (done: Function) => {
             diagram.getCustomProperty = (propName: string): any => {
                 if (propName === 'nodes') {

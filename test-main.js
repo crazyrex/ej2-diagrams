@@ -21,6 +21,7 @@ require.config({
             name: '@syncfusion/ej2-base',
             location: 'node_modules/@syncfusion/ej2-base/dist',
             main: 'ej2-base.umd.min.js'
+
         },
         {
             name: '@syncfusion/ej2-buttons',

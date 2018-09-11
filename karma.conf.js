@@ -17,6 +17,13 @@ module.exports = function (config) {
         files: [
             "test-main.js",
             "styles/diagram/material.css",
+            "node_modules/@syncfusion/ej2-base/styles/material.css",
+            "node_modules/@syncfusion/ej2-buttons/styles/material.css",
+            "node_modules/@syncfusion/ej2-inputs/styles/material.css",
+            "node_modules/@syncfusion/ej2-popups/styles/material.css",
+            "node_modules/@syncfusion/ej2-lists/styles/material.css",
+            "node_modules/@syncfusion/ej2-navigations/styles/material.css",
+            "node_modules/@syncfusion/ej2-splitbuttons/styles/material.css",
             { pattern: "src/**/*.js", included: false },
             { pattern: "spec/**/*.spec.js", included: false },
             { pattern: "spec/images/bike.jpg", included: false },

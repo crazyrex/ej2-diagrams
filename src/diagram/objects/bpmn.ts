@@ -12,9 +12,9 @@ import { PointPortModel } from './../objects/port-model';
 import { Connector } from './../objects/connector';
 import { BpmnAnnotation } from './../objects/node';
 import { BpmnFlowModel, ConnectorModel } from './../objects/connector-model';
-import { Transform } from '../enum/enum';
+import { Transform, DiagramAction } from '../enum/enum';
 import { PointModel } from '../primitives/point-model';
-import { findAngle, Segment, getIntersectionPoints, getPortDirection } from '../utility/connector';
+import { findAngle, getIntersectionPoints, getPortDirection } from '../utility/connector';
 import { Point } from '../primitives/point';
 import { NodeConstraints, BpmnActivities, ConnectorConstraints, BpmnShapes } from '../enum/enum';
 import { BpmnEventModel, BpmnSubEventModel, BpmnActivityModel } from './../objects/node-model';
@@ -30,6 +30,7 @@ import { IElement } from '../objects/interface/IElement';
 import { Rect } from '../primitives/rect';
 import { Size } from '../primitives/size';
 import { getDiagramElement } from '../utility/dom-util';
+import { Segment } from '../interaction/scroller';
 
 /**
  * BPMN Diagrams contains the BPMN functionalities
@@ -119,14 +120,17 @@ export class BpmnDiagrams {
         if (shape.shape === 'Activity') {
             content = this.getBPMNActivityShape(node);
         }
+        if (shape.shape === 'TextAnnotation') {
+            content = this.renderBPMNTextAnnotation(diagram, node, content);
+        }
         let annotations: {} = {};
         if (shape.annotations.length > 0) {
             for (let i: number = 0; i < shape.annotations.length && shape.annotations[i].text; i++) {
                 (content as Canvas).children.push(this.getBPMNTextAnnotation(
                     node, diagram, shape.annotations[i], content));
             }
+            content.style.strokeDashArray = '2 2 6 2';
         }
-        content.style.strokeDashArray = '2 2 6 2';
         return content;
     }
     /** @private */
@@ -426,22 +430,20 @@ export class BpmnDiagrams {
         }
     }
     private setSubProcessVisibility(node: Node): void {
-        if ((node.shape as BpmnShape).activity.subProcess) {
-            let subProcess: BpmnSubProcessModel = (node.shape as BpmnShape).activity.subProcess;
-            let eventLength: number = subProcess.events.length;
-            let index: number = ((node.shape as BpmnShape).activity.subProcess.type === 'Transaction') ? 2 : 0;
+        let subProcess: BpmnSubProcessModel = (node.shape as BpmnShape).activity.subProcess;
+        let eventLength: number = subProcess.events.length;
+        let index: number = ((node.shape as BpmnShape).activity.subProcess.type === 'Transaction') ? 2 : 0;
 
-            let elementWrapper: Canvas = (node.wrapper.children[0] as Canvas).children[0] as Canvas;
-            if (subProcess.adhoc === false) {
-                elementWrapper.children[3 + index + eventLength].visible = false;
-            }
-            if (subProcess.compensation === false) {
-                elementWrapper.children[4 + index + eventLength].visible = false;
-            }
-            if (eventLength > 0) {
-                for (let i: number = 0; i < eventLength; i++) {
-                    this.setEventVisibility(node, (elementWrapper.children[2 + i] as Container).children);
-                }
+        let elementWrapper: Canvas = (node.wrapper.children[0] as Canvas).children[0] as Canvas;
+        if (subProcess.adhoc === false) {
+            elementWrapper.children[3 + index + eventLength].visible = false;
+        }
+        if (subProcess.compensation === false) {
+            elementWrapper.children[4 + index + eventLength].visible = false;
+        }
+        if (eventLength > 0) {
+            for (let i: number = 0; i < eventLength; i++) {
+                this.setEventVisibility(node, (elementWrapper.children[2 + i] as Container).children);
             }
         }
     }
@@ -566,7 +568,6 @@ export class BpmnDiagrams {
 
         let transactionEvents: Canvas = new Canvas();
         transactionEvents.id = node.id + '_transaction_events';
-
         transactionEvents.style.gradient = node.style.gradient;
         let transaction: BpmnTransactionSubProcessModel = shape.activity.subProcess.transaction;
 
@@ -630,7 +631,7 @@ export class BpmnDiagrams {
     }
     /** @private */
     public dropBPMNchild(target: Node, source: Node, diagram: Diagram): void {
-        if (source && source.shape.type === 'Bpmn') {
+        if (source && source.shape.type === 'Bpmn' && (source.shape as BpmnShape).shape !== 'TextAnnotation') {
             let subProcess: BpmnSubProcessModel = (diagram.nameTable[target.id].shape as BpmnShape).activity.subProcess;
             if (diagram.currentSymbol && target.shape.type === 'Bpmn' && !subProcess.collapsed) {
                 source.processId = target.id;
@@ -659,7 +660,9 @@ export class BpmnDiagrams {
                 let edges: string[] = [];
                 edges = edges.concat((source as Node).outEdges, (source as Node).inEdges);
                 for (let i: number = edges.length - 1; i >= 0; i--) {
-                    diagram.remove(diagram.nameTable[edges[i]]);
+                    if (diagram.bpmnModule.textAnnotationConnectors.indexOf(diagram.nameTable[edges[i]]) === -1) {
+                        diagram.remove(diagram.nameTable[edges[i]]);
+                    }
                 }
                 let obj: NodeModel = cloneObject(source);
                 let entry: HistoryEntry = {
@@ -754,7 +757,7 @@ export class BpmnDiagrams {
         let parentNode: NodeModel = diagram.nameTable[parentId];
         let subProcess: BpmnSubProcessModel = (parentNode.shape as BpmnShape).activity.subProcess;
         if (node && parentNode && parentNode.shape.type === 'Bpmn' && node.shape.type === 'Bpmn' &&
-            subProcess.processes && !subProcess.collapsed) {
+            subProcess.processes) {
             node.processId = parentId;
             let processes: string[] = (parentNode.shape as BpmnShape).activity.subProcess.processes;
             if (processes.indexOf(id) < 0) {
@@ -895,12 +898,12 @@ export class BpmnDiagrams {
     private getBPMNTextAnnotation(
         node: Node, diagram: Diagram, annotation: BpmnAnnotationModel, content: DiagramElement): Canvas {
         annotation.id = annotation.id || randomId();
+        (annotation as BpmnAnnotation).nodeId = node.id;
         let annotationContainer: Canvas = new Canvas();
         let annotationPath: PathElement = new PathElement();
         let textElement: TextElement = new TextElement();
 
         let margin: number = 10;
-
         annotationPath.id = node.id + '_' + annotation.id + '_path';
         annotationPath.width = annotation.width;
         annotationPath.height = annotation.height;
@@ -943,12 +946,20 @@ export class BpmnDiagrams {
             }];
         annotationNode.offsetX = annotationContainer.offsetX;
         annotationNode.offsetY = annotationContainer.offsetY;
+        (annotationNode as BpmnAnnotationModel).text = annotation.text;
+        (annotationNode as BpmnAnnotationModel).angle = annotation.angle;
+        (annotationNode as BpmnAnnotationModel).length = annotation.length;
+
+        annotationNode.width = annotation.width;
+        annotationNode.height = annotation.height;
         annotationNode.wrapper = annotationContainer;
 
         annotationContainer.children.push(annotationNode.initPortWrapper(annotationNode.ports[0] as Port));
         let bounds: Rect = new Rect(0, 0, 0, 0);
-        if (node.width !== undefined && node.height !== undefined) {
-            bounds = new Rect(node.offsetX - node.width / 2, node.offsetY - node.height / 2, node.width, node.height);
+        let width: number = node.width || node.minWidth || 0;
+        let height: number = node.height || node.minHeight || 0;
+        if (width !== undefined && height !== undefined) {
+            bounds = new Rect(node.offsetX - width / 2, node.offsetY - height / 2, width, height);
         }
         this.setAnnotationPath(
             bounds, annotationContainer, { x: annotationNode.offsetX, y: annotationNode.offsetY }, annotationNode,
@@ -956,7 +967,7 @@ export class BpmnDiagrams {
 
         let connector: ConnectorModel = {
             id: node.id + '_' + annotation.id + '_connector',
-            constraints: ConnectorConstraints.Default & ~ConnectorConstraints.DragTargetEnd,
+            constraints: ConnectorConstraints.Default & ~(ConnectorConstraints.DragTargetEnd | ConnectorConstraints.Drag),
             sourceID: node.id, targetID: annotationContainer.id,
             targetDecorator: { shape: 'None' }
         };
@@ -984,6 +995,79 @@ export class BpmnDiagrams {
         annotationNode.zIndex = 10000;
         return annotationContainer;
     }
+    /** @private */
+    private renderBPMNTextAnnotation(
+        diagram: Diagram, annotation: BpmnAnnotationModel, content: DiagramElement): Canvas {
+        annotation.id = annotation.id || randomId();
+        let annotationsContainer: Canvas = new Canvas();
+        let annotationPath: PathElement = new PathElement();
+        let textObject: TextElement = new TextElement();
+
+        let margin: number = 10;
+
+        annotationPath.id = '_' + annotation.id + '_path';
+        annotationPath.width = annotation.width;
+        annotationPath.height = annotation.height;
+        annotationPath.relativeMode = 'Object';
+        textObject.id = annotation.id + '_text';
+        textObject.content = ((annotation as Node).shape as BpmnShape).annotation.text;
+        let textStyle: TextStyleModel = (annotation as Node).style;
+        textObject.style = {
+            fontSize: textStyle.fontSize, italic: textStyle.italic, gradient: null, opacity: textStyle.opacity,
+            bold: textStyle.bold, textWrapping: textStyle.textWrapping, color: textStyle.color, fill: 'white',
+            fontFamily: textStyle.fontFamily, whiteSpace: textStyle.whiteSpace, textOverflow: 'Wrap',
+            strokeColor: 'none', strokeWidth: 0,
+            strokeDashArray: textStyle.strokeDashArray, textAlign: textStyle.textAlign, textDecoration: textStyle.textDecoration
+        };
+        textObject.horizontalAlignment = 'Left';
+        textObject.verticalAlignment = 'Center';
+        textObject.relativeMode = 'Object';
+        textObject.margin = { left: 5, right: 5, top: 5, bottom: 5 };
+
+        annotationsContainer.offsetX = (annotation as Node).offsetX + ((annotation as Node).shape as BpmnShape).annotation.length *
+            Math.cos(((annotation as Node).shape as BpmnShape).annotation.angle * (Math.PI / 180));
+        annotationsContainer.offsetY = (annotation as Node).offsetY + ((annotation as Node).shape as BpmnShape).annotation.length *
+            Math.sin(((annotation as Node).shape as BpmnShape).annotation.angle * (Math.PI / 180));
+        annotationsContainer.float = true;
+        //    annotationContainer.transform = Transform.Self;
+        annotationsContainer.id = (annotation as Node).id + '_textannotation_' + annotation.id;
+        annotationsContainer.style.strokeColor = 'transparent';
+        annotationsContainer.margin = { left: margin, right: margin, top: margin, bottom: margin };
+        annotationsContainer.relativeMode = 'Object';
+        annotationsContainer.rotateAngle = 0;
+        annotationsContainer.children = [annotationPath, textObject];
+
+        let annotationObject: Node = new Node(
+            (annotation as Node).shape, 'annotations',
+            { id: annotationsContainer.id, shape: { type: 'Bpmn', shape: 'TextAnnotation' } }, true);
+        annotationObject.ports = [
+            {
+                id: annotationPath.id + '_port', shape: 'Square',
+                offset: { x: 0, y: 0.5 },
+            }];
+        annotationObject.offsetX = annotationsContainer.offsetX;
+        annotationObject.offsetY = annotationsContainer.offsetY;
+        if ((annotationObject as Node).shape && ((annotationObject as Node).shape as BpmnShape).annotation) {
+            (annotationObject as BpmnAnnotationModel).text = ((annotation as Node).shape as BpmnShape).annotation.text;
+            (annotationObject as BpmnAnnotationModel).angle = ((annotation as Node).shape as BpmnShape).annotation.angle;
+            (annotationObject as BpmnAnnotationModel).length = ((annotation as Node).shape as BpmnShape).annotation.length;
+        }
+        annotationObject.width = annotation.width;
+        annotationObject.height = annotation.height;
+        annotationObject.wrapper = annotationsContainer;
+
+        annotationsContainer.children.push(annotationObject.initPortWrapper(annotationObject.ports[0] as Port));
+        let bounds: Rect = new Rect(0, 0, 0, 0);
+        let width: number = (annotation as Node).width || 0;
+        let height: number = (annotation as Node).height || 0;
+        if (width !== undefined && height !== undefined) {
+            bounds = new Rect((annotation as Node).offsetX - width / 2, (annotation as Node).offsetY - height / 2, width, height);
+        }
+        this.setAnnotationPath(
+            bounds, annotationsContainer, { x: annotationObject.offsetX, y: annotationObject.offsetY }, annotationObject,
+            annotation.length, annotation.angle);
+        return annotationsContainer;
+    }
 
     /** @private */
     public getTextAnnotationWrapper(node: NodeModel, id: string): TextElement {
@@ -1003,6 +1087,7 @@ export class BpmnDiagrams {
     public addAnnotation(node: NodeModel, annotation: BpmnAnnotationModel, diagram: Diagram): ConnectorModel {
         let bpmnShapeContent: Canvas = node.wrapper.children[0] as Canvas;
         let shape: BpmnShape = node.shape as BpmnShape;
+        (annotation as BpmnAnnotation).nodeId = node.id;
         let annotationObj: BpmnAnnotation = new BpmnAnnotation(shape, 'annotations', annotation, true);
         shape.annotations.push(annotationObj);
         bpmnShapeContent.children.push(
@@ -1031,7 +1116,7 @@ export class BpmnDiagrams {
             if ((node.shape as BpmnShape).shape === 'TextAnnotation') {
                 let id: string[] = node.id.split('_');
                 let annotationId: string = id[id.length - 1];
-                let nodeId: string = id[id.length - 3];
+                let nodeId: string = id[id.length - 3] || id[0];
                 let parentNode: NodeModel = diagram.nameTable[nodeId];
                 let bpmnShape: BpmnShape = parentNode.shape as BpmnShape;
                 for (let annotation of bpmnShape.annotations) {
@@ -1055,6 +1140,13 @@ export class BpmnDiagrams {
         let bpmnShape: BpmnShape = parentNode.shape as BpmnShape;
         let index: number = bpmnShape.annotations.indexOf(annotation);
         if (index !== -1) {
+            if (!(diagram.diagramActions & DiagramAction.UndoRedo) && !(diagram.diagramActions & DiagramAction.Group)) {
+                let entry: HistoryEntry = {
+                    type: 'CollectionChanged', changeType: 'Remove', undoObject: cloneObject(annotation),
+                    redoObject: cloneObject(annotation), category: 'Internal'
+                };
+                diagram.addHistoryEntry(entry);
+            }
             bpmnShape.annotations.splice(index, 1);
             let entry: {} = this.annotationObjects[parentNode.id];
             if (entry && entry[annotation.id]) {
@@ -1098,8 +1190,8 @@ export class BpmnDiagrams {
             textElement.margin.top = textElement.margin.bottom = 10;
             point = parentBounds.middleRight;
             segment = {
-                X1: parentBounds.right, Y1: parentBounds.top,
-                X2: parentBounds.right, Y2: parentBounds.bottom
+                x1: parentBounds.right, y1: parentBounds.top,
+                x2: parentBounds.right, y2: parentBounds.bottom
             };
         } else if (rotateAngle === 180) {
             data = 'M0,0 L10,0 L10,20 L0,20';
@@ -1109,8 +1201,8 @@ export class BpmnDiagrams {
             textElement.margin.top = textElement.margin.bottom = 10;
             point = parentBounds.middleLeft;
             segment = {
-                X1: parentBounds.left, Y1: parentBounds.top,
-                X2: parentBounds.left, Y2: parentBounds.bottom
+                x1: parentBounds.left, y1: parentBounds.top,
+                x2: parentBounds.left, y2: parentBounds.bottom
             };
         } else if (rotateAngle === 90) {
             data = 'M20,10 L20,0 L0,0 L0,10';
@@ -1120,8 +1212,8 @@ export class BpmnDiagrams {
             textElement.margin.left = textElement.margin.right = 10;
             point = parentBounds.bottomCenter;
             segment = {
-                X1: parentBounds.right, Y1: parentBounds.bottom,
-                X2: parentBounds.left, Y2: parentBounds.bottom
+                x1: parentBounds.right, y1: parentBounds.bottom,
+                x2: parentBounds.left, y2: parentBounds.bottom
             };
         } else {
             data = 'M0,0 L0,10 L20,10 L20,0';
@@ -1131,8 +1223,8 @@ export class BpmnDiagrams {
             textElement.margin.left = textElement.margin.right = 10;
             point = parentBounds.topCenter;
             segment = {
-                X1: parentBounds.right, Y1: parentBounds.top,
-                X2: parentBounds.left, Y2: parentBounds.top,
+                x1: parentBounds.right, y1: parentBounds.top,
+                x2: parentBounds.left, y2: parentBounds.top,
             };
         }
         let center: PointModel = parentBounds.center;
@@ -1205,8 +1297,6 @@ export class BpmnDiagrams {
                             let connector: ConnectorModel = this.annotationObjects[actualObject.id][annotation[j].id].connector;
                             let direction: string = getPortDirection(
                                 connector.targetPoint, actualObject.wrapper.bounds, actualObject.wrapper.bounds, false);
-
-
                             let position: PointModel = connector.sourcePoint;
                             position = {
                                 x: connector.sourcePoint.x + actualObject.offsetX - (oldObject.offsetX),
@@ -1227,23 +1317,17 @@ export class BpmnDiagrams {
             }
         }
     }
-    /** @private */
-    public findInteractableObject(obj: ConnectorModel, diagram: Diagram): NodeModel | ConnectorModel {
-        if (obj.targetID) {
-            let targetNode: NodeModel = diagram.nameTable[obj.targetID];
-            if (targetNode.shape.type === 'Bpmn' && (targetNode.shape as BpmnShape).shape === 'TextAnnotation') {
-                return targetNode;
-            }
-        }
-        return obj;
-    }
-    /** @private */
-    public canAdd(obj: NodeModel): boolean {
-        if (obj.shape && obj.shape.type === 'Bpmn' && (obj.shape as BpmnShape).shape === 'TextAnnotation') {
-            return false;
-        }
-        return true;
-    }
+    // /** @private */
+    // public findInteractableObject(obj: ConnectorModel, diagram: Diagram): NodeModel | ConnectorModel {
+    //     if (obj.targetID) {
+    //         let targetNode: NodeModel = diagram.nameTable[obj.targetID];
+    //         if (targetNode.shape.type === 'Bpmn' && (targetNode.shape as BpmnShape).shape === 'TextAnnotation') {
+    //             return targetNode;
+    //         }
+    //     }
+    //     return obj;
+    // }
+
 
     /** @private */
     private getSubprocessChildCount(node: Node): number {
@@ -1498,9 +1582,6 @@ export class BpmnDiagrams {
         }
         let bpmnshapeTriggerdata: string = getBpmnTriggerShapePathData(
             bpmnShape.event.trigger);
-        if (bpmnShape.event.trigger) {
-            elementWrapper.height = elementWrapper.height * 0.8;
-        }
         (elementWrapper as PathModel).data = bpmnshapeTriggerdata;
     }
     /** @private */
@@ -2227,21 +2308,21 @@ export function getBpmnLoopShapePathData(shape: string): string {
 let bpmnShapes: {} = {
 
     'Event': 'M80.5,12.5 C80.5,19.127417 62.59139,24.5 40.5,24.5 C18.40861,24.5 0.5,19.127417 0.5,12.5' +
-    'C0.5,5.872583 18.40861,0.5 40.5,0.5 C62.59139,0.5 80.5,5.872583 80.5,12.5 z',
+        'C0.5,5.872583 18.40861,0.5 40.5,0.5 C62.59139,0.5 80.5,5.872583 80.5,12.5 z',
 
     'Message': 'M0,0L19.8,12.8L40,0L0,0L0,25.5L40,25.5L40,0z',
 
     'DataSource': 'M 0 10.6 c 0 5.9 16.8 10.6 37.5 10.6 S 75 16.4 75 10.6 v 0 v 68.9 v -0.1 C 75 85.3 58.2 90 37.5 90 ' +
-    'S 0 85.3 0 79.4 l 0 0.1 V 56 V 40.6 L 0 10.6 C 0 4.7 16.8 0 37.5 0 S 75 4.7 75 10.6 S 58.2 21.2 37.5 21.2' +
-    'S 0 16.5 0 10.6 l 0 6.7 v -0.2 c 0 5.9 16.8 10.6 37.5 10.6 S 75 22.9 75 17.1 v 6.8 v -0.1 ' +
-    'c 0 5.9 -16.8 10.6 -37.5 10.6 S 0 29.6 0 23.8',
+        'S 0 85.3 0 79.4 l 0 0.1 V 56 V 40.6 L 0 10.6 C 0 4.7 16.8 0 37.5 0 S 75 4.7 75 10.6 S 58.2 21.2 37.5 21.2' +
+        'S 0 16.5 0 10.6 l 0 6.7 v -0.2 c 0 5.9 16.8 10.6 37.5 10.6 S 75 22.9 75 17.1 v 6.8 v -0.1 ' +
+        'c 0 5.9 -16.8 10.6 -37.5 10.6 S 0 29.6 0 23.8',
 
     'SubProcess': 'M100,100 h200 a20,20 0 0 1 20,20 v200 a20,20 0 0 1 -20,20 h-200 ' +
-    'a20,20 0 0 1 -20,-20 v-200 a20,20 0 0 1 20,-20 z',
+        'a20,20 0 0 1 -20,-20 v-200 a20,20 0 0 1 20,-20 z',
 
     'collapsedShape': 'M 8.13789 15 H 0 V 0 H 8.13789 V 15 Z M 0.625991 13.75 H 7.51189 V 1.25 H 0.625991 V 13.75 Z ' +
-    'M 2.18095 7.03125 L 5.95631 7.03125 L 5.95631 7.46875 L 2.18095 7.46875 Z M 3.8342 3.73 ' +
-    'L 4.30369 3.73 L 4.30369 11.2687 L 3.8342 11.2687 Z',
+        'M 2.18095 7.03125 L 5.95631 7.03125 L 5.95631 7.46875 L 2.18095 7.46875 Z M 3.8342 3.73 ' +
+        'L 4.30369 3.73 L 4.30369 11.2687 L 3.8342 11.2687 Z',
 };
 
 let bpmnTriggerShapes: {} = {
@@ -2250,12 +2331,12 @@ let bpmnTriggerShapes: {} = {
     'Message': 'M0,0 L19.8,12.8 L40,0 L0, 0 L0, 25.5 L40, 25.5 L 40, 0',
 
     'Timer': 'M40,20c0,8.654-5.496,16.024-13.189,18.81' +
-    'C24.685,39.58,22.392,40,20,40C8.954,40,0,31.046,0,20S8.954,0,20,0S40,8.954,40,20z M20,0 L20,2.583 L20,5.283 M10.027,2.681' +
-    'L11.659,5.507 L12.669,7.257 M2.731,9.989 L6.014,11.885 L7.307,12.631 M0.067,19.967 L2.667,19.967 L5.35,19.967' +
-    'M2.748,29.939 L5.731,28.217 L7.323,27.298 M10.056,37.236 L11.292,35.095 L12.698,32.66 M20.033,39.9 L20.033,36.417 L20.033,34.617' +
-    'M30.006,37.219 L28.893,35.292 L27.364,32.643 M37.302,29.911 L34.608,28.355 L32.727,27.269' +
-    'M39.967,19.933 L37.417,19.933 L34.683,19.933 M37.286,9.961 L34.583,11.521 L32.71,12.602 M29.977,2.664 L28.653,4.957 L27.336,' +
-    '7.24 M22.104,8.5 L19.688,20 L24.75,20 L31.604,20 L24.75,20 L19.688,20z',
+        'C24.685,39.58,22.392,40,20,40C8.954,40,0,31.046,0,20S8.954,0,20,0S40,8.954,40,20z M20,0 L20,2.583 L20,5.283 M10.027,2.681' +
+        'L11.659,5.507 L12.669,7.257 M2.731,9.989 L6.014,11.885 L7.307,12.631 M0.067,19.967 L2.667,19.967 L5.35,19.967' +
+        'M2.748,29.939 L5.731,28.217 L7.323,27.298 M10.056,37.236 L11.292,35.095 L12.698,32.66 M20.033,39.9 L20.033,36.417 L20.033,34.617' +
+        'M30.006,37.219 L28.893,35.292 L27.364,32.643 M37.302,29.911 L34.608,28.355 L32.727,27.269' +
+        'M39.967,19.933 L37.417,19.933 L34.683,19.933 M37.286,9.961 L34.583,11.521 L32.71,12.602 M29.977,2.664 L28.653,4.957 L27.336,' +
+        '7.24 M22.104,8.5 L19.688,20 L24.75,20 L31.604,20 L24.75,20 L19.688,20z',
 
     'Error': 'M 23.77 18.527 l -7.107 27.396 l 8.507 -17.247 L 36.94 40.073 l 6.394 -25.997 l -8.497 15.754 L 23.77 18.527 Z',
 
@@ -2276,136 +2357,136 @@ let bpmnTriggerShapes: {} = {
     'Multiple': 'M 17.784 48.889 H 42.21 l 7.548 -23.23 L 29.997 11.303 L 10.236 25.658 L 17.784 48.889 Z',
 
     'Parallel': 'M 27.276 49.986 h 5.58 v -17.15 h 17.146 V 27.17 h -17.15 l 0.004 -17.15 h -5.58 l -0.004 17.15 ' +
-    'H 9.994 v 5.666 h 17.278 L 27.276 49.986 Z',
+        'H 9.994 v 5.666 h 17.278 L 27.276 49.986 Z',
 };
 
 let bpmnGatewayShapes: {} = {
     'None': '',
     //exclusive
     'Exclusive': 'M 11.196 29.009 l 6.36 -9.712 l -5.764 -8.899 h 4.393 l 3.732 5.979 l 3.656 -5.979 h 4.354 l -5.789 9.039' +
-    'l 6.36 9.572 h -4.532 l -4.126 -6.437 l -4.139 6.437 H 11.196 Z',
+        'l 6.36 9.572 h -4.532 l -4.126 -6.437 l -4.139 6.437 H 11.196 Z',
 
     //inclusive
     'Inclusive': 'M 20.323 31.333 c -6.625 0 -12.015 -5.39 -12.015 -12.015 s 5.39 -12.015 12.015 -12.015 ' +
-    's 12.016 5.39 12.016 12.015 S 26.948 31.333 20.323 31.333 Z M 20.323 9.303 c -5.522 0 -10.015 4.493 -10.015 10.015 ' +
-    's 4.492 10.015 10.015 10.015 s 10.016 -4.493 10.016 -10.015 S 25.846 9.303 20.323 9.303 Z',
+        's 12.016 5.39 12.016 12.015 S 26.948 31.333 20.323 31.333 Z M 20.323 9.303 c -5.522 0 -10.015 4.493 -10.015 10.015 ' +
+        's 4.492 10.015 10.015 10.015 s 10.016 -4.493 10.016 -10.015 S 25.846 9.303 20.323 9.303 Z',
 
     //parallel
     'Parallel': 'M 18.394 29.542 v -8.833 H 9.626 v -3.691 h 8.768 V 8.251 h 3.734 v 8.767 h 8.768 v 3.691 h -8.768 v 8.833 H 18.394 Z',
 
     //complex
     'Complex': 'M29.198,19.063L23.089,19.063L27.794,14.358L26.38,12.944L21.223,18.101L21.223,10.443L19.223,10.443L19.223,17.976' +
-    'L14.022,12.776L12.608,14.19L17.48,19.063L10.365,19.063L10.365,21.063L18.261,21.063L12.392,26.932L13.806,28.346' +
-    'L19.223,22.929L19.223,30.225L21.223,30.225L21.223,22.805L25.925,27.507L27.339,26.093L22.309,21.063L29.198,21.063z',
+        'L14.022,12.776L12.608,14.19L17.48,19.063L10.365,19.063L10.365,21.063L18.261,21.063L12.392,26.932L13.806,28.346' +
+        'L19.223,22.929L19.223,30.225L21.223,30.225L21.223,22.805L25.925,27.507L27.339,26.093L22.309,21.063L29.198,21.063z',
 
     //eventbased
     'EventBased': 'M 20.322 29.874 c -5.444 0 -9.873 -4.43 -9.873 -9.874 s 4.429 -9.874 9.873 -9.874 s 9.874 4.429 9.874 9.874 ' +
-    'S 25.767 29.874 20.322 29.874 Z M 20.322 32.891 c -7.107 0 -12.89 -5.783 -12.89 -12.891 c 0 -7.107 5.782 -12.89 12.89 -12.89 ' +
-    'c 7.108 0 12.891 5.783 12.891 12.89 C 33.213 27.108 27.431 32.891 20.322 32.891 Z M 24.191 25.386 ' +
-    'h -7.984 l -2.469 -7.595 l 6.461 -4.693 l 6.461 4.693 L 24.191 25.386 Z',
+        'S 25.767 29.874 20.322 29.874 Z M 20.322 32.891 c -7.107 0 -12.89 -5.783 -12.89 -12.891 c 0 -7.107 5.782 -12.89 12.89 -12.89 ' +
+        'c 7.108 0 12.891 5.783 12.891 12.89 C 33.213 27.108 27.431 32.891 20.322 32.891 Z M 24.191 25.386 ' +
+        'h -7.984 l -2.469 -7.595 l 6.461 -4.693 l 6.461 4.693 L 24.191 25.386 Z',
 
     //exclusive event based
     'ExclusiveEventBased': 'M 30 15 C 30 23.28 23.28 30 15 30 S 0 23.28 0 15 S 6.72 0 15 0 S 30 6.72 30 15 z M 15 5 ' +
-    'L 5 12.5 L 8 22.5 H 22 L 25 12.5 z',
+        'L 5 12.5 L 8 22.5 H 22 L 25 12.5 z',
 
     //parallel event based
     'ParallelEventBased': 'M 35 17.5 C 35 27.16 27.16 35 17.5 35 S 0 27.16 0 17.5 S 7.84 0 17.5 0 S 35 7.84 35 17.5 z M 14.58 5.83 ' +
-    'V 14.58 H 5.83 V 20.42 H 14.58 V 29.17 H 20.42 V 20.42 H 29.17 V 14.58 H 20.42 V 5.83 z',
+        'V 14.58 H 5.83 V 20.42 H 14.58 V 29.17 H 20.42 V 20.42 H 29.17 V 14.58 H 20.42 V 5.83 z',
 };
 
 let bpmnTaskShapes: {} = {
     'None': '',
     'Service': 'M 32.699 20.187 v -4.005 h -3.32 c -0.125 -0.43 -0.292 -0.83 -0.488 -1.21 l 2.373 -2.375 ' +
-    'l -2.833 -2.83 l -2.333 2.333 c -0.44 -0.253 -0.9 -0.448 -1.387 -0.595 v -3.32 h -4.003 v 3.32 c -0.46 0.137 -0.89' +
-    '0.322 -1.3 0.537 l -2.285 -2.275 l -2.833 2.83 l 2.285 2.278 c -0.235 0.42 -0.41 0.847 -0.547 1.307 h -3.33 v 4.005 h 3.33 ' +
-    'c 0.148 0.488 0.343 0.955 0.588 1.395 l -2.325 2.325 l 2.822 2.832 l 2.373 -2.382 c 0.392 0.205 0.792 0.37 1.212 0.497 v 3.33 ' +
-    'h 4.003 v -3.33 c 0.46 -0.138 0.89 -0.323 1.3 -0.547 l 2.43 2.432 l 2.822 -2.832 l -2.42 -2.422 c 0.222 -0.41 0.4 -0.85 0.535' +
-    '-1.297 H 32.699 Z M 22.699 21.987 c -2.1 0 -3.803 -1.703 -3.803 -3.803 c 0 -2.1 1.703 -3.803 3.803 -3.803 c 2.1 0 3.803 ' +
-    '1.703 3.803 3.803 C 26.502 20.285 24.8 21.987 22.699 21.987 Z',
+        'l -2.833 -2.83 l -2.333 2.333 c -0.44 -0.253 -0.9 -0.448 -1.387 -0.595 v -3.32 h -4.003 v 3.32 c -0.46 0.137 -0.89' +
+        '0.322 -1.3 0.537 l -2.285 -2.275 l -2.833 2.83 l 2.285 2.278 c -0.235 0.42 -0.41 0.847 -0.547 1.307 h -3.33 v 4.005 h 3.33 ' +
+        'c 0.148 0.488 0.343 0.955 0.588 1.395 l -2.325 2.325 l 2.822 2.832 l 2.373 -2.382 c 0.392 0.205 0.792 0.37 1.212 0.497 v 3.33 ' +
+        'h 4.003 v -3.33 c 0.46 -0.138 0.89 -0.323 1.3 -0.547 l 2.43 2.432 l 2.822 -2.832 l -2.42 -2.422 c 0.222 -0.41 0.4 -0.85 0.535' +
+        '-1.297 H 32.699 Z M 22.699 21.987 c -2.1 0 -3.803 -1.703 -3.803 -3.803 c 0 -2.1 1.703 -3.803 3.803 -3.803 c 2.1 0 3.803 ' +
+        '1.703 3.803 3.803 C 26.502 20.285 24.8 21.987 22.699 21.987 Z',
 
     'Receive': 'M 12.217 12.134 v 13.334 h 20 V 12.134 H 12.217 Z M 30.44 13.007 l -8.223 5.35 l -8.223 -5.35 H 30.44 Z M 13.09' +
-    ' 24.594 V 13.459 l 9.127 5.94 l 9.127 -5.94 v 11.135 H 13.09 Z',
+        ' 24.594 V 13.459 l 9.127 5.94 l 9.127 -5.94 v 11.135 H 13.09 Z',
 
     'Send': 'M 45.7256 3.16055 L 25 23.4017 L 4.27442 3.16055 H 45.7256 Z M 47.8963 46.8413 H 2.10375 V 4.80813' +
-    ' L 25 27.1709 L 47.8963 4.80813 V 46.8413 Z',
+        ' L 25 27.1709 L 47.8963 4.80813 V 46.8413 Z',
 
     'InstantiatingReceive': 'M 16.306 17.39 v 8.79 h 13.198 v -8.79 H 16.306 Z M 28.375 17.946 l -5.47 3.558 l -5.47 -3.558 ' +
-    'H 28.375 Z M 28.948 25.625 H 16.861 v -7.389 l 6.043 3.931 l 6.043 -3.931 V 25.625 Z M 22.905 11.785' +
-    'c -5.514 0 -9.999 4.486 -9.999 10 c 0 5.514 4.485 10 9.999 10 s 9.999 -4.486 9.999 -10 ' +
-    'C 32.904 16.272 28.419 11.785 22.905 11.785 Z M 22.905 31.239 c -5.212 0 -9.453 -4.241 -9.453 -9.454' +
-    'c 0 -5.212 4.241 -9.453 9.453 -9.453 s 9.452 4.241 9.452 9.453 C 32.357 26.998 28.117 31.239 22.905 31.239 Z',
+        'H 28.375 Z M 28.948 25.625 H 16.861 v -7.389 l 6.043 3.931 l 6.043 -3.931 V 25.625 Z M 22.905 11.785' +
+        'c -5.514 0 -9.999 4.486 -9.999 10 c 0 5.514 4.485 10 9.999 10 s 9.999 -4.486 9.999 -10 ' +
+        'C 32.904 16.272 28.419 11.785 22.905 11.785 Z M 22.905 31.239 c -5.212 0 -9.453 -4.241 -9.453 -9.454' +
+        'c 0 -5.212 4.241 -9.453 9.453 -9.453 s 9.452 4.241 9.452 9.453 C 32.357 26.998 28.117 31.239 22.905 31.239 Z',
 
     'Manual': 'M 13.183 15.325 h 2.911 c 0.105 0 0.207 -0.043 0.281 -0.117 c 0.078 -0.074 0.117 -0.176 0.117 -0.281' +
-    'c 0 -0.753 0.718 -1.362 1.596 -1.362 h 2.579 c -0.117 0.227 -0.191 0.48 -0.195 0.757 c 0 0.433 0.168 0.851 0.46 1.144 ' +
-    'c 0.008 0.004 0.015 0.011 0.019 0.015 c -0.289 0.285 -0.475 0.691 -0.479 1.148 c 0 0.433 0.168 0.846 0.46 1.139 ' +
-    'c 0.011 0.012 0.023 0.02 0.035 0.032 c -0.301 0.281 -0.491 0.694 -0.495 1.155 c 0 0.432 0.168 0.847 0.46 1.143' +
-    'c 0.265 0.266 0.612 0.414 0.975 0.414 h 0.839 c 0.027 0.004 0.051 0.012 0.074 0.012 h 8.443 ' +
-    'c 0.352 0 0.636 0.344 0.636 0.761 c 0 0.414 -0.285 0.753 -0.636 0.753 h -6.687 c -0.019 0 -0.035 -0.008 -0.051 -0.008' +
-    'h -2.27 c -0.121 -0.835 -0.667 -1.187 -1.795 -1.187 h -2.158 c -0.223 0 -0.402 0.18 -0.402 0.403' +
-    'c 0 0.219 0.179 0.398 0.402 0.398 h 2.158 c 0.972 0 1.019 0.203 1.019 0.784 c 0 0.219 0.179 0.399 0.402 0.399 ' +
-    'c 0.008 0 0.016 -0.004 0.027 -0.004 c 0.028 0.004 0.055 0.016 0.082 0.016 h 2.56 c 0.34 0.015 0.616 0.343 0.616 0.752' +
-    'c 0 0.418 -0.285 0.757 -0.636 0.761 h -0.004 h -6.442 c -0.878 0 -1.595 -0.639 -1.595 -1.427 v -0.683 ' +
-    'c 0 -0.109 -0.043 -0.211 -0.114 -0.285 c -0.078 -0.074 -0.179 -0.117 -0.285 -0.117 h -0.004 l -2.989 0.027 ' +
-    'c -0.223 0 -0.398 0.184 -0.398 0.402 c 0 0.219 0.179 0.395 0.398 0.395 h 0.004 l 2.591 -0.02 v 0.282 ' +
-    'c 0 1.229 1.073 2.223 2.391 2.223 h 3.895 c 0.004 0 0.007 0.004 0.011 0.004 h 2.536 c 0.792 0 1.436 -0.698 1.436 -1.561 ' +
-    'c 0 -0.273 -0.07 -0.53 -0.188 -0.752 h 5.49 c 0.792 0 1.436 -0.695 1.436 -1.553 c 0 -0.858 -0.644 -1.557 -1.436 -1.557' +
-    'h -3.566 c 0.121 -0.226 0.199 -0.487 0.199 -0.768 c 0 -0.468 -0.195 -0.882 -0.495 -1.167' +
-    'c 0.301 -0.285 0.495 -0.698 0.495 -1.163 c 0 -0.456 -0.191 -0.866 -0.483 -1.152 c 0.293 -0.285 0.483 -0.694 0.483 -1.151' +
-    'c 0 -0.858 -0.647 -1.557 -1.439 -1.557 h -8.373 c -1.167 0 -2.142 0.757 -2.352 1.76 l -2.548 -0.004 ' +
-    'c -0.219 0 -0.399 0.18 -0.399 0.403 C 12.784 15.145 12.964 15.325 13.183 15.325 L 13.183 15.325 Z M 21.907 19.707 ' +
-    'c -0.191 0 -0.328 -0.094 -0.41 -0.176 c -0.144 -0.145 -0.226 -0.355 -0.226 -0.577 c 0.003 -0.418 0.289 -0.753 0.643 -0.753 ' +
-    'h 4.468 c 0.008 0 0.015 -0.004 0.027 -0.008 h 0.051 c 0.351 0 0.636 0.344 0.636 0.761 c 0 0.414 -0.286 0.753 -0.636 0.753 ' +
-    'H 21.907 Z M 27.097 16.629 c 0 0.414 -0.286 0.753 -0.64 0.753 h -4.464 c -0.004 0 -0.004 0 -0.004 0 h -0.082' +
-    'c -0.191 0 -0.328 -0.098 -0.414 -0.18 c -0.14 -0.145 -0.222 -0.352 -0.222 -0.573 c 0 -0.413 0.285 -0.749 0.631 -0.753' +
-    'h 3.434 c 0 0 0 0 0.004 0 h 1.116 c 0.008 0 0.012 -0.004 0.02 -0.004 C 26.819 15.887 27.097 16.215 27.097 16.629' +
-    'L 27.097 16.629 Z M 27.097 14.322 c 0 0.41 -0.278 0.737 -0.62 0.749 c -0.008 0 -0.012 0 -0.016 0 h -3.637 ' +
-    'c -0.008 0 -0.015 0.004 -0.023 0.004 h -0.886 c -0.004 0 -0.008 0 -0.012 0 c -0.187 0 -0.324 -0.094 -0.406 -0.176' +
-    'c -0.144 -0.144 -0.226 -0.355 -0.226 -0.577 c 0.003 -0.414 0.293 -0.753 0.643 -0.753 h 4.468 ' +
-    'c 0.008 0 0.015 -0.004 0.027 -0.004 h 0.051 C 26.811 13.565 27.097 13.905 27.097 14.322 L 27.097 14.322 Z M 27.097 14.322',
+        'c 0 -0.753 0.718 -1.362 1.596 -1.362 h 2.579 c -0.117 0.227 -0.191 0.48 -0.195 0.757 c 0 0.433 0.168 0.851 0.46 1.144 ' +
+        'c 0.008 0.004 0.015 0.011 0.019 0.015 c -0.289 0.285 -0.475 0.691 -0.479 1.148 c 0 0.433 0.168 0.846 0.46 1.139 ' +
+        'c 0.011 0.012 0.023 0.02 0.035 0.032 c -0.301 0.281 -0.491 0.694 -0.495 1.155 c 0 0.432 0.168 0.847 0.46 1.143' +
+        'c 0.265 0.266 0.612 0.414 0.975 0.414 h 0.839 c 0.027 0.004 0.051 0.012 0.074 0.012 h 8.443 ' +
+        'c 0.352 0 0.636 0.344 0.636 0.761 c 0 0.414 -0.285 0.753 -0.636 0.753 h -6.687 c -0.019 0 -0.035 -0.008 -0.051 -0.008' +
+        'h -2.27 c -0.121 -0.835 -0.667 -1.187 -1.795 -1.187 h -2.158 c -0.223 0 -0.402 0.18 -0.402 0.403' +
+        'c 0 0.219 0.179 0.398 0.402 0.398 h 2.158 c 0.972 0 1.019 0.203 1.019 0.784 c 0 0.219 0.179 0.399 0.402 0.399 ' +
+        'c 0.008 0 0.016 -0.004 0.027 -0.004 c 0.028 0.004 0.055 0.016 0.082 0.016 h 2.56 c 0.34 0.015 0.616 0.343 0.616 0.752' +
+        'c 0 0.418 -0.285 0.757 -0.636 0.761 h -0.004 h -6.442 c -0.878 0 -1.595 -0.639 -1.595 -1.427 v -0.683 ' +
+        'c 0 -0.109 -0.043 -0.211 -0.114 -0.285 c -0.078 -0.074 -0.179 -0.117 -0.285 -0.117 h -0.004 l -2.989 0.027 ' +
+        'c -0.223 0 -0.398 0.184 -0.398 0.402 c 0 0.219 0.179 0.395 0.398 0.395 h 0.004 l 2.591 -0.02 v 0.282 ' +
+        'c 0 1.229 1.073 2.223 2.391 2.223 h 3.895 c 0.004 0 0.007 0.004 0.011 0.004 h 2.536 c 0.792 0 1.436 -0.698 1.436 -1.561 ' +
+        'c 0 -0.273 -0.07 -0.53 -0.188 -0.752 h 5.49 c 0.792 0 1.436 -0.695 1.436 -1.553 c 0 -0.858 -0.644 -1.557 -1.436 -1.557' +
+        'h -3.566 c 0.121 -0.226 0.199 -0.487 0.199 -0.768 c 0 -0.468 -0.195 -0.882 -0.495 -1.167' +
+        'c 0.301 -0.285 0.495 -0.698 0.495 -1.163 c 0 -0.456 -0.191 -0.866 -0.483 -1.152 c 0.293 -0.285 0.483 -0.694 0.483 -1.151' +
+        'c 0 -0.858 -0.647 -1.557 -1.439 -1.557 h -8.373 c -1.167 0 -2.142 0.757 -2.352 1.76 l -2.548 -0.004 ' +
+        'c -0.219 0 -0.399 0.18 -0.399 0.403 C 12.784 15.145 12.964 15.325 13.183 15.325 L 13.183 15.325 Z M 21.907 19.707 ' +
+        'c -0.191 0 -0.328 -0.094 -0.41 -0.176 c -0.144 -0.145 -0.226 -0.355 -0.226 -0.577 c 0.003 -0.418 0.289 -0.753 0.643 -0.753 ' +
+        'h 4.468 c 0.008 0 0.015 -0.004 0.027 -0.008 h 0.051 c 0.351 0 0.636 0.344 0.636 0.761 c 0 0.414 -0.286 0.753 -0.636 0.753 ' +
+        'H 21.907 Z M 27.097 16.629 c 0 0.414 -0.286 0.753 -0.64 0.753 h -4.464 c -0.004 0 -0.004 0 -0.004 0 h -0.082' +
+        'c -0.191 0 -0.328 -0.098 -0.414 -0.18 c -0.14 -0.145 -0.222 -0.352 -0.222 -0.573 c 0 -0.413 0.285 -0.749 0.631 -0.753' +
+        'h 3.434 c 0 0 0 0 0.004 0 h 1.116 c 0.008 0 0.012 -0.004 0.02 -0.004 C 26.819 15.887 27.097 16.215 27.097 16.629' +
+        'L 27.097 16.629 Z M 27.097 14.322 c 0 0.41 -0.278 0.737 -0.62 0.749 c -0.008 0 -0.012 0 -0.016 0 h -3.637 ' +
+        'c -0.008 0 -0.015 0.004 -0.023 0.004 h -0.886 c -0.004 0 -0.008 0 -0.012 0 c -0.187 0 -0.324 -0.094 -0.406 -0.176' +
+        'c -0.144 -0.144 -0.226 -0.355 -0.226 -0.577 c 0.003 -0.414 0.293 -0.753 0.643 -0.753 h 4.468 ' +
+        'c 0.008 0 0.015 -0.004 0.027 -0.004 h 0.051 C 26.811 13.565 27.097 13.905 27.097 14.322 L 27.097 14.322 Z M 27.097 14.322',
 
 
     'BusinessRule': 'M 32.844 13.245 h -0.089 v 0 H 13.764 v -0.015 h -1.009 v 16.989 h 0.095 v 0.011 h 19.716 v -0.011 h 0.278 ' +
-    'V 13.245 Z M 31.844 14.229 v 4.185 h -18.08 v -4.185 H 31.844 Z M 18.168 25.306 v 3.938 h -4.404 v -3.938 H 18.168 Z ' +
-    'M 13.764 24.322 v -4.923 h 4.404 v 4.923 H 13.764 Z M 19.177 25.306 h 12.667 v 3.938 H 19.177 V 25.306 Z M 19.177 24.322' +
-    'v -4.923 h 12.667 v 4.923 H 19.177 Z',
+        'V 13.245 Z M 31.844 14.229 v 4.185 h -18.08 v -4.185 H 31.844 Z M 18.168 25.306 v 3.938 h -4.404 v -3.938 H 18.168 Z ' +
+        'M 13.764 24.322 v -4.923 h 4.404 v 4.923 H 13.764 Z M 19.177 25.306 h 12.667 v 3.938 H 19.177 V 25.306 Z M 19.177 24.322' +
+        'v -4.923 h 12.667 v 4.923 H 19.177 Z',
 
     'User': 'M 21.762 21.935 c 2.584 0 4.687 -2.561 4.687 -5.703 c 0 -3.147 -2.103 -5.703 -4.687 -5.703 c -1.279 0 -2.475 0.61' +
-    '-3.363 1.721 c -0.855 1.071 -1.327 2.484 -1.324 3.983 C 17.075 19.374 19.178 21.935 21.762 21.935 L 21.762 21.935 Z' +
-    'M 21.762 11.779 c 1.894 0 3.436 1.995 3.436 4.452 c 0 2.453 -1.541 4.452 -3.436 4.452 c -1.895 0 -3.44 -1.999 -3.44 -4.452' +
-    'C 18.323 13.774 19.864 11.779 21.762 11.779 L 21.762 11.779 Z M 25.699 21.309 c -0.348 0 -0.626 0.277 -0.626 0.626 ' +
-    'c 0 0.344 0.277 0.622 0.626 0.622 c 2.136 0 3.875 1.74 3.875 3.879 c 0 0.272 -0.227 0.498 -0.501 0.498 H 14.447 c -0.274 0 ' +
-    '-0.497 -0.223 -0.497 -0.498 c 0 -2.139 1.736 -3.879 3.872 -3.879 c 0.344 0 0.625 -0.277 0.625 -0.622 c 0 -0.348 -0.28 -0.626' +
-    '-0.625 -0.626 c -2.826 0 -5.124 2.297 -5.124 5.126 c 0 0.965 0.784 1.749 1.748 1.749 h 14.626 c 0.964 0 1.748 -0.784' +
-    '1.748 -1.749 C 30.822 23.606 28.524 21.309 25.699 21.309 L 25.699 21.309 Z M 22.217 9.832 c 0.448 -0.263 0.924 -0.396 ' +
-    '1.419 -0.396 c 1.895 0 3.436 1.995 3.436 4.452 c 0 0.439 -0.048 0.873 -0.143 1.284 c -0.08 0.336 0.128 0.672 0.464 0.751 ' +
-    'c 0.048 0.012 0.098 0.019 0.143 0.019 c 0.284 0 0.541 -0.195 0.608 -0.483 c 0.119 -0.506 0.18 -1.034 0.18 -1.571' +
-    'c 0 -3.147 -2.102 -5.703 -4.687 -5.703 c -0.711 0 -1.419 0.198 -2.054 0.573 c -0.296 0.174 -0.397 0.559 -0.219 0.855' +
-    'C 21.536 9.911 21.921 10.009 22.217 9.832 L 22.217 9.832 Z M 27.697 18.81 c -0.345 0 -0.626 0.277 -0.626 0.622 ' +
-    'c 0 0.348 0.281 0.626 0.626 0.626 c 2.137 0 3.75 1.782 3.75 3.918 c 0 0.07 -0.013 0.141 -0.043 0.205 c -0.14 0.314 0.003' +
-    '0.684 0.318 0.823 c 0.082 0.037 0.167 0.055 0.253 0.055 c 0.241 0 0.466 -0.141 0.57 -0.373 c 0.101 -0.226 0.153 -0.464 0.153' +
-    '-0.714 C 32.699 21.15 30.523 18.81 27.697 18.81 L 27.697 18.81 Z M 27.697 18.81',
+        '-3.363 1.721 c -0.855 1.071 -1.327 2.484 -1.324 3.983 C 17.075 19.374 19.178 21.935 21.762 21.935 L 21.762 21.935 Z' +
+        'M 21.762 11.779 c 1.894 0 3.436 1.995 3.436 4.452 c 0 2.453 -1.541 4.452 -3.436 4.452 c -1.895 0 -3.44 -1.999 -3.44 -4.452' +
+        'C 18.323 13.774 19.864 11.779 21.762 11.779 L 21.762 11.779 Z M 25.699 21.309 c -0.348 0 -0.626 0.277 -0.626 0.626 ' +
+        'c 0 0.344 0.277 0.622 0.626 0.622 c 2.136 0 3.875 1.74 3.875 3.879 c 0 0.272 -0.227 0.498 -0.501 0.498 H 14.447 c -0.274 0 ' +
+        '-0.497 -0.223 -0.497 -0.498 c 0 -2.139 1.736 -3.879 3.872 -3.879 c 0.344 0 0.625 -0.277 0.625 -0.622 c 0 -0.348 -0.28 -0.626' +
+        '-0.625 -0.626 c -2.826 0 -5.124 2.297 -5.124 5.126 c 0 0.965 0.784 1.749 1.748 1.749 h 14.626 c 0.964 0 1.748 -0.784' +
+        '1.748 -1.749 C 30.822 23.606 28.524 21.309 25.699 21.309 L 25.699 21.309 Z M 22.217 9.832 c 0.448 -0.263 0.924 -0.396 ' +
+        '1.419 -0.396 c 1.895 0 3.436 1.995 3.436 4.452 c 0 0.439 -0.048 0.873 -0.143 1.284 c -0.08 0.336 0.128 0.672 0.464 0.751 ' +
+        'c 0.048 0.012 0.098 0.019 0.143 0.019 c 0.284 0 0.541 -0.195 0.608 -0.483 c 0.119 -0.506 0.18 -1.034 0.18 -1.571' +
+        'c 0 -3.147 -2.102 -5.703 -4.687 -5.703 c -0.711 0 -1.419 0.198 -2.054 0.573 c -0.296 0.174 -0.397 0.559 -0.219 0.855' +
+        'C 21.536 9.911 21.921 10.009 22.217 9.832 L 22.217 9.832 Z M 27.697 18.81 c -0.345 0 -0.626 0.277 -0.626 0.622 ' +
+        'c 0 0.348 0.281 0.626 0.626 0.626 c 2.137 0 3.75 1.782 3.75 3.918 c 0 0.07 -0.013 0.141 -0.043 0.205 c -0.14 0.314 0.003' +
+        '0.684 0.318 0.823 c 0.082 0.037 0.167 0.055 0.253 0.055 c 0.241 0 0.466 -0.141 0.57 -0.373 c 0.101 -0.226 0.153 -0.464 0.153' +
+        '-0.714 C 32.699 21.15 30.523 18.81 27.697 18.81 L 27.697 18.81 Z M 27.697 18.81',
 
     'Script': 'M 22.453 15.04 c 0 0 -1.194 -3.741 2.548 -3.774 c 0 0 2.497 0.126 1.766 4.321 c -0.008 0.043 -0.015 0.086 -0.024 0.13' +
-    'c -0.806 4.323 -2.516 8.42 -3.193 10.581 h 3.904 c 0 0 0.983 4.581 -2.549 4.968 H 13.292 c 0 0 -3.097 -1.42 -1.517 -5.323 l ' +
-    '3 -10.839 H 11.84 c 0 0 -1.129 -2.902 1.709 -3.806 l 11.425 -0.032 l -0.73 0.355 l -1.193 1.726 L 22.453 15.04 Z M 22.409 ' +
-    '12.597 c 0 0 -0.242 0.483 -0.278 0.98 h -9.098 c 0 0 -0.06 -0.871 0.714 -1.041 L 22.409 12.597 Z M 26.341 27.734' +
-    'c 0 0 -0.13 2.678 -2.226 1.871 c 0 0 -0.823 -0.565 -0.758 -1.855 L 26.341 27.734 Z M 22.905 15.008 c 0 0 0.653 -0.258 0.709' +
-    '-1.501 c 0 0 0.145 -1.144 1.483 -0.693 c 0 0 0.808 0.355 0.259 2.404 c 0 0 -2.226 8.5 -3.032 10.339 c 0 0 -1.064 2.646 ' +
-    '0.096 4.226 h -8.581 c 0 0 -1.806 -0.452 -0.741 -3.613 c 0 0 2.935 -9.549 3.193 -11.162 L 22.905 15.008 Z',
+        'c -0.806 4.323 -2.516 8.42 -3.193 10.581 h 3.904 c 0 0 0.983 4.581 -2.549 4.968 H 13.292 c 0 0 -3.097 -1.42 -1.517 -5.323 l ' +
+        '3 -10.839 H 11.84 c 0 0 -1.129 -2.902 1.709 -3.806 l 11.425 -0.032 l -0.73 0.355 l -1.193 1.726 L 22.453 15.04 Z M 22.409 ' +
+        '12.597 c 0 0 -0.242 0.483 -0.278 0.98 h -9.098 c 0 0 -0.06 -0.871 0.714 -1.041 L 22.409 12.597 Z M 26.341 27.734' +
+        'c 0 0 -0.13 2.678 -2.226 1.871 c 0 0 -0.823 -0.565 -0.758 -1.855 L 26.341 27.734 Z M 22.905 15.008 c 0 0 0.653 -0.258 0.709' +
+        '-1.501 c 0 0 0.145 -1.144 1.483 -0.693 c 0 0 0.808 0.355 0.259 2.404 c 0 0 -2.226 8.5 -3.032 10.339 c 0 0 -1.064 2.646 ' +
+        '0.096 4.226 h -8.581 c 0 0 -1.806 -0.452 -0.741 -3.613 c 0 0 2.935 -9.549 3.193 -11.162 L 22.905 15.008 Z',
 };
 
 let bpmnLoopShapes: {} = {
     'None': '',
     'Standard': 'M 52.002 73.379 c -2.494 -2.536 -6.55 -2.534 -9.043 0 c -1.208 1.228 -1.874 2.861 -1.874 4.598 ' +
-    'c 0 1.225 0.337 2.395 0.957 3.411 l -1.167 1.186 l 2.071 0.458 l 2.071 0.458 l -0.45 -2.106 l -0.45 -2.106 l -1.292 1.314' +
-    'c -1.119 -2.065 -0.842 -4.709 0.877 -6.458 c 2.084 -2.119 5.475 -2.117 7.557 0 c 2.083 2.119 2.083 5.565 0 7.685' +
-    'c -0.976 0.992 -2.272 1.557 -3.65 1.59 l 0.025 1.068 c 1.65 -0.041 3.2 -0.716 4.368 -1.903 ' +
-    'c 1.208 -1.228 1.874 -2.861 1.874 -4.597 C 53.875 76.24 53.209 74.607 52.002 73.379 Z',
+        'c 0 1.225 0.337 2.395 0.957 3.411 l -1.167 1.186 l 2.071 0.458 l 2.071 0.458 l -0.45 -2.106 l -0.45 -2.106 l -1.292 1.314' +
+        'c -1.119 -2.065 -0.842 -4.709 0.877 -6.458 c 2.084 -2.119 5.475 -2.117 7.557 0 c 2.083 2.119 2.083 5.565 0 7.685' +
+        'c -0.976 0.992 -2.272 1.557 -3.65 1.59 l 0.025 1.068 c 1.65 -0.041 3.2 -0.716 4.368 -1.903 ' +
+        'c 1.208 -1.228 1.874 -2.861 1.874 -4.597 C 53.875 76.24 53.209 74.607 52.002 73.379 Z',
 
     'ParallelMultiInstance': 'M 51.5,69.5 L52.5,69.5 L52.5,84.5 L51.5 84.5 Z M 46.5,69.5 L47.5,69.5 L47.5,84.5 L46.5 84.5 Z' +
-    ' M 41.5,69.5 L42.5,69.5 L42.5,84.5 L41.5 84.5 Z  ',
+        ' M 41.5,69.5 L42.5,69.5 L42.5,84.5 L41.5 84.5 Z  ',
 
     'SequenceMultiInstance': 'M 40.375,71.5 L 55.375,71.5 L 55.375,72.5 L 40.375,72.5 Z M 40.375,76.5 L 55.375,76.5 ' +
-    'L 55.375,77.5 L 40.375,77.5 Z M 40.375,76.5 L 55.375,76.5 L 55.375,77.5 L 40.375,77.5 Z M 40.375,81.5 L 55.375,81.5' +
-    'L 55.375,82.5 L 40.375,82.5 Z'
+        'L 55.375,77.5 L 40.375,77.5 Z M 40.375,76.5 L 55.375,76.5 L 55.375,77.5 L 40.375,77.5 Z M 40.375,81.5 L 55.375,81.5' +
+        'L 55.375,82.5 L 40.375,82.5 Z'
 };

@@ -3,7 +3,7 @@ import { Diagram } from '../../../src/diagram/diagram';
 import { PointPortModel } from '../../../src/diagram/objects/port-model';
 import { Connector } from '../../../src/diagram/objects/connector';
 import { Node } from '../../../src/diagram/objects/node';
-import { ConnectorModel, BpmnFlowModel } from '../../../src/diagram/objects/connector-model';
+import { ConnectorModel, BpmnFlowModel, StraightSegmentModel } from '../../../src/diagram/objects/connector-model';
 import { NodeModel, BasicShapeModel } from '../../../src/diagram/objects/node-model';
 import { TextStyleModel } from '../../../src/diagram/core/appearance-model';
 import { BpmnDiagrams } from '../../../src/diagram/objects/bpmn';
@@ -17,6 +17,7 @@ import { MouseEvents } from './mouseevents.spec';
 import { UndoRedo } from '../../../src/diagram/objects/undo-redo';
 import { SnapConstraints } from '../../../src/diagram/index';
 import { DiagramTools, DiagramConstraints } from '../../../src/diagram/enum/enum';
+import { MenuItemModel } from '@syncfusion/ej2-navigations';
 Diagram.Inject(BpmnDiagrams, DiagramContextMenu, UndoRedo);
 /**
  * Interaction Specification Document
@@ -100,6 +101,18 @@ describe('Diagram Control', () => {
             mouseEvents.clickEvent(diagramCanvas, 150, 150);
 
             expect(diagram.selectedItems.nodes.length == 1 && diagram.selectedItems.nodes[0].id == 'node1').toBe(true);
+            done();
+        });
+
+        it('TestCases for pivot line rendering', (done: Function) => {
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.clickEvent(diagramCanvas, 150, 150);
+            expect(diagram.selectedItems.nodes.length == 1 && diagram.selectedItems.nodes[0].id == 'node1').toBe(true);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 800, 100);
+            mouseEvents.mouseLeaveEvent(diagramCanvas);
+            let pivotelem = document.querySelector('.e-diagram-pivot-line');
+            let pivotelemstyle = getComputedStyle(pivotelem);
+            expect(pivotelemstyle.stroke === 'rgb(227, 22, 91)').toBe(true);
             done();
         });
 
@@ -450,7 +463,7 @@ describe('Diagram Control', () => {
             ];
 
             diagram = new Diagram({
-                width: 550, height: 550, nodes: nodes, connectors: connectors, snapSettings: { constraints: SnapConstraints.ShowLines }
+                width: 1000, height: 550, nodes: nodes, connectors: connectors, snapSettings: { constraints: SnapConstraints.ShowLines }
             });
 
             diagram.appendTo('#diagramconnectnodport');
@@ -548,7 +561,6 @@ describe('Diagram Control', () => {
         });
 
         it('Checking removing source end connector to source port connection', (done: Function) => {
-
             let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
             mouseEvents.clickEvent(diagramCanvas, 558, 108);
 
@@ -1311,8 +1323,8 @@ describe('Diagram Control', () => {
                 Math.round(diagram.selectedItems.height) == height + 20 &&
                 diagram.selectedItems.offsetX == offsetX + 10 &&
                 Math.round(diagram.selectedItems.offsetY) == offsetY + 10).toBe(true);
-                 mouseEvents.clickEvent(diagramCanvas, 300, 300);
-                 expect(diagram.selectedItems.nodes.length === 1).toBe(true);
+            mouseEvents.clickEvent(diagramCanvas, 300, 300);
+            expect(diagram.selectedItems.nodes.length === 1).toBe(true);
             done();
 
         });
@@ -1478,7 +1490,7 @@ describe('Diagram Control', () => {
             mouseEvents.mouseDownEvent(diagramCanvas, 300 + diagram.element.offsetLeft, 300 + diagram.element.offsetTop);
             mouseEvents.mouseMoveEvent(diagramCanvas, 400 + diagram.element.offsetLeft, 400 + diagram.element.offsetTop);
 
-            //mouseEvents.mouseLeaveEvent(diagramCanvas);
+            mouseEvents.mouseLeaveEvent(diagramCanvas);
             expect(diagram.selectedItems.connectors.length == 1).toBe(false); done();
         });
     });
@@ -1681,6 +1693,42 @@ describe('Diagram Control', () => {
             expect(diagram.selectedItems.connectors[0].wrapper.width === 100 && diagram.selectedItems.connectors[0].wrapper.height === 100).toBe(true);
             done();
         });
+        it('Draw Polyline connector', (done: Function) => {
+            diagram.tool = DiagramTools.DrawOnce;
+            let connectors: ConnectorModel = {
+                id: 'connector1', type: 'Polyline',
+            };
+            diagram.drawingObject = connectors;
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.mouseDownEvent(diagramCanvas, 150, 150);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 250, 400);
+            mouseEvents.mouseDownEvent(diagramCanvas, 250, 500);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 500, 100);
+            mouseEvents.mouseDownEvent(diagramCanvas, 500, 100);
+            mouseEvents.dblclickEvent(diagramCanvas, 500, 100);
+            expect((diagram.selectedItems.connectors as ConnectorModel)[0].segments &&
+                (diagram.selectedItems.connectors as ConnectorModel)[0].segments.length !== 0).toBe(true);
+            diagram.drawingObject = null;
+            done();
+        });
+        it('Draw Polyline connector on mouseleave', (done: Function) => {
+            diagram.tool = DiagramTools.DrawOnce;
+            let connectors: ConnectorModel = {
+                id: 'connector1', type: 'Polyline',
+            };
+            diagram.drawingObject = connectors;
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.mouseDownEvent(diagramCanvas, 150, 150);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 250, 400);
+            mouseEvents.mouseDownEvent(diagramCanvas, 250, 500);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 500, 100);
+            mouseEvents.mouseDownEvent(diagramCanvas, 500, 100);
+            mouseEvents.mouseLeaveEvent(diagramCanvas);
+            expect((diagram.selectedItems.connectors as ConnectorModel)[0].segments &&
+                (diagram.selectedItems.connectors as ConnectorModel)[0].segments.length !== 0).toBe(true);
+            diagram.drawingObject = null;
+            done();
+        });
 
         it('Draw Straight Connector Reverse', (done: Function) => {
             diagram.tool = DiagramTools.DrawOnce
@@ -1872,6 +1920,23 @@ describe('Diagram Control', () => {
                 (connector as Connector).targetPortID !== '').toBe(true);
             expect(diagram.selectedItems.connectors.length && diagram.selectedItems.connectors[0].id.indexOf('connect6'));
             expect(diagram.selectedItems.connectors[0].wrapper.width === 50 && diagram.selectedItems.connectors[0].wrapper.height === 0).toBe(true);
+            done();
+        });
+
+        it('Draw Basic Shapes - Polygon and scrolling', (done: Function) => {
+            diagram.tool = DiagramTools.DrawOnce;
+            let connectors: ConnectorModel = {
+                id: 'connector1', type: 'Polyline',
+            };
+            diagram.drawingObject = connectors;
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.mouseDownEvent(diagramCanvas, 150, 150);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 250, 400);
+            mouseEvents.mouseDownEvent(diagramCanvas, 250, 500);
+            mouseEvents.mouseMoveEvent(diagramCanvas, 500, 100);
+            mouseEvents.mouseWheelEvent(diagramCanvas, 500, 850, false);
+            mouseEvents.dblclickEvent(diagramCanvas, 500, 850);
+            expect(diagram.scroller.horizontalOffset === 0 && diagram.scroller.verticalOffset === -20).toBe(true);
             done();
         });
 
@@ -2289,7 +2354,7 @@ describe('Diagram Control', () => {
                 (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
                 let e = {
                     event: (diagram.contextMenuModule as any).eventArgs,
-                    items: diagram.contextMenuModule.contextMenu.items,
+                    items: diagram.contextMenuModule.contextMenu.items as MenuItemModel[],
                 };
                 for (let i of e.items) {
                     if (i.id ===
@@ -2323,7 +2388,7 @@ describe('Diagram Control', () => {
                 (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
                 let e = {
                     event: (diagram.contextMenuModule as any).eventArgs,
-                    items: diagram.contextMenuModule.contextMenu.items,
+                    items: diagram.contextMenuModule.contextMenu.items as MenuItemModel[],
                 };
                 for (let i of e.items) {
                     if (i.id ===
@@ -2354,7 +2419,7 @@ describe('Diagram Control', () => {
                 (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
                 let e = {
                     event: (diagram.contextMenuModule as any).eventArgs,
-                    items: diagram.contextMenuModule.contextMenu.items,
+                    items: diagram.contextMenuModule.contextMenu.items as MenuItemModel[],
                 };
 
                 for (let i of e.items) {
@@ -2403,7 +2468,7 @@ describe('Diagram Control', () => {
                 (diagram.contextMenuModule as any).eventArgs = { target: document.getElementById('diagramdraw_diagramAdorner_svg') };
                 let e = {
                     event: (diagram.contextMenuModule as any).eventArgs,
-                    items: diagram.contextMenuModule.contextMenu.items[7].items,
+                    items: (diagram.contextMenuModule.contextMenu.items[7] as MenuItemModel).items,
                 };
                 diagram.select([diagram.nodes[0]]);
                 for (let i of e.items) {
@@ -2729,8 +2794,8 @@ let node12: NodeModel = {
 };
 let shape21: BasicShapeModel = { type: 'Basic', shape: 'Rectangle' };
 let node121: NodeModel = {
-    id: 'node121', offsetX: 300, offsetY: 400,width:100,height:100,
-     shape: shape21,
+    id: 'node121', offsetX: 300, offsetY: 400, width: 100, height: 100,
+    shape: shape21,
 
 };
 
@@ -2758,7 +2823,7 @@ describe('Tool constraints TestCases', () => {
         document.body.appendChild(ele);
         diagram = new Diagram({
             width: '1000px', height: '1000px', mode: 'SVG',
-            nodes: [node11, node12,node121],
+            nodes: [node11, node12, node121],
             //width: '1000px', height: '1000px',
             //nodes: [node11, node12],
             connectors: connectors,
@@ -2777,7 +2842,7 @@ describe('Tool constraints TestCases', () => {
         expect(diagram.selectedItems.nodes.length === 1).toBe(true)
 
         done();
-        
+
     });
     it('Rotate Api Resize issue', (done: Function) => {
         let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
@@ -3233,5 +3298,44 @@ describe('Diagram constraints TestCases', () => {
     afterAll((): void => {
         diagram.destroy();
         ele.remove();
+    });
+    
+    describe('Drawing Tool - Connector Issue', () => {
+        let diagram: Diagram;
+        let ele: HTMLElement;
+
+        let mouseEvents: MouseEvents = new MouseEvents();
+
+        beforeAll((): void => {
+            ele = createElement('div', { id: 'diagramdrawConnectorIssue' });
+            document.body.appendChild(ele);
+            diagram = new Diagram({
+                width: '1000px', height: '1000px', connectors: [{
+                    id: 'connector2',
+                    type: 'Orthogonal',
+                    sourcePoint: { x: 300, y: 100 },
+                    targetPoint: { x: 400, y: 200 },
+                }], snapSettings: { constraints: SnapConstraints.ShowLines }
+            });
+            diagram.appendTo('#diagramdrawConnectorIssue');
+        });
+
+        afterAll((): void => {
+            diagram.destroy();
+            ele.remove();
+        });
+
+        it('Draw connector issue - check source id', (done: Function) => {
+            let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
+            mouseEvents.clickEvent(diagramCanvas, 10, 10);
+            diagram.tool = DiagramTools.DrawOnce
+            diagram.drawingObject = {
+                type: 'Straight',
+            }            
+            mouseEvents.dragAndDropEvent(diagramCanvas, diagram.connectors[0].targetPoint.x+diagram.element.offsetLeft, diagram.connectors[0].targetPoint.y, 150, 150);
+            expect(diagram.connectors.length == 2 && diagram.connectors[0].sourceID == '' && diagram.connectors[0].targetID == ''&&
+            diagram.connectors[1].sourceID == '' && diagram.connectors[1].targetID == '').toBe(true);
+            done();
+        });        
     });
 });

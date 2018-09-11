@@ -1,6 +1,6 @@
 import { ShadowModel, GradientModel } from '../core/appearance-model';
 import { PointModel } from './../primitives/point-model';
-import { TextOverflow, Scale, ImageAlignment, Stretch } from '../enum/enum';
+import { TextOverflow, Scale, ImageAlignment, Stretch, TextWrap } from '../enum/enum';
 
 /**
  * canvas interface
@@ -91,6 +91,7 @@ export interface TextAttributes extends BaseAttributes {
     content: string;
     breakWord: string;
     fontSize: number;
+    textWrapping: TextWrap;
     fontFamily: string;
     bold: boolean;
     italic: boolean;

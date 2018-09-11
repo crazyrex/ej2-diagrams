@@ -9,7 +9,7 @@ import { DiagramElement } from '../core/elements/diagram-element';
 import { getUserHandlePosition, checkPortRestriction } from '../utility/diagram-util';
 import { NodeModel } from './../objects/node-model';
 import { canMove, canDragSourceEnd, canDragTargetEnd, canContinuousDraw, canDragSegmentThumb } from '../utility/constraints-util';
-import { canZoomPan, defaultTool, canDrawOnce, canDrag, canDraw } from '../utility/constraints-util';
+import { canZoomPan, defaultTool, canDrawOnce, canDrag, canDraw, canSelect, canRotate } from '../utility/constraints-util';
 import { canShowCorner, canResizeCorner } from '../utility/diagram-util';
 import { Point } from '../primitives/point';
 import { ITouches } from '../objects/interface/interfaces';
@@ -19,7 +19,8 @@ import { Selector } from './selector';
 import { SelectorModel } from './selector-model';
 import { PointPortModel } from './../objects/port-model';
 import { PointPort } from './../objects/port';
-
+import { ShapeAnnotation, PathAnnotation } from '../objects/annotation';
+import { ShapeAnnotationModel, PathAnnotationModel } from '../objects/annotation-model';
 /**
  * Finds the action to be taken for the object under mouse
  * 
@@ -29,15 +30,11 @@ import { PointPort } from './../objects/port';
 export function findToolToActivate(
     obj: Object, wrapper: DiagramElement, position: PointModel, diagram: Diagram,
     touchStart?: ITouches[] | TouchList, touchMove?: ITouches[] | TouchList,
-    target?: NodeModel | PointPortModel): Actions {
+    target?: NodeModel | PointPortModel | ShapeAnnotationModel | PathAnnotationModel): Actions {
     let conn: Connector = diagram.selectedItems.connectors[0] as Connector;
 
-    if (touchMove && touchMove.length > 1 && touchStart && touchStart.length > 1) {
-        return 'PinchZoom';
-    }
-    if (diagram.currentSymbol) {
-        return 'Drag';
-    }
+    if (touchMove && touchMove.length > 1 && touchStart && touchStart.length > 1) { return 'PinchZoom'; }
+    if (diagram.currentSymbol) { return 'Drag'; }
     let eventHandler: string = 'eventHandler';
     if (diagram[eventHandler].action === 'PortDraw') {
         diagram.tool &= ~DiagramTools.DrawOnce;
@@ -58,14 +55,13 @@ export function findToolToActivate(
         }
     }
     //Panning
-    if (canZoomPan(diagram) && !obj) {
-        return 'Pan';
-    }
+    if (canZoomPan(diagram) && !obj) { return 'Pan'; }
     if (hasSelection(diagram)) {
-        let element: DiagramElement = diagram.selectedItems.wrapper; let selectorBnds: Rect = element.bounds;
+        let element: DiagramElement = ((diagram.selectedItems as Selector).annotation) ?
+            diagram.selectedItems.wrapper.children[0] : diagram.selectedItems.wrapper;
+        let selectorBnds: Rect = element.bounds; let handle: SelectorModel = diagram.selectedItems;
         let paddedBounds: Rect = new Rect(selectorBnds.x, selectorBnds.y, selectorBnds.width, selectorBnds.height);
-        let handle: SelectorModel = diagram.selectedItems;
-        if (hasSingleConnection(diagram)) {
+        if (hasSingleConnection(diagram) && !(diagram.selectedItems as Selector).annotation) {
             let conn: Connector = diagram.selectedItems.connectors[0] as Connector;
             let sourcePaddingValue: number = 10 / diagram.scrollSettings.currentZoom;
             let targetPaddingValue: number = 10 / diagram.scrollSettings.currentZoom;
@@ -90,9 +86,11 @@ export function findToolToActivate(
             let y: number = element.offsetY - element.pivot.y * element.actualSize.height;
             let rotateThumb: PointModel = { x: x + element.actualSize.width / 2, y: y - 30 / diagram.scroller.currentZoom };
             rotateThumb = transformPointByMatrix(matrix, rotateThumb);
-            if ((canShowCorner(handle.constraints, 'Rotate')) && contains(position, rotateThumb, ten) &&
+            let labelSelection: boolean = (diagram.selectedItems as Selector).annotation ? true : false;
+            let labelRotate: boolean = (labelSelection && (canRotate((diagram.selectedItems as Selector).annotation))) ? true : false;
+            if (canShowCorner(handle.constraints, 'Rotate') && contains(position, rotateThumb, ten) &&
                 ((diagram.selectedItems as Selector).thumbsConstraints & ThumbsConstraints.Rotate)) {
-                return 'Rotate';
+                if (labelSelection && labelRotate) { return 'LabelRotate'; } else if (!labelSelection) { return 'Rotate'; }
             }
             paddedBounds.Inflate(ten);
             if (paddedBounds.containsPoint(position)) {
@@ -103,9 +101,10 @@ export function findToolToActivate(
     }
     if (target instanceof PointPort && (!canZoomPan(diagram))) {
         let action: Actions = findPortToolToActivate(diagram, target);
-        if (action !== 'None') {
-            return action;
-        }
+        if (action !== 'None') { return action; }
+    }
+    if ((target instanceof ShapeAnnotation || target instanceof PathAnnotation) && (!canZoomPan(diagram) && (canSelect(target)))) {
+        if (isSelected(diagram, target, undefined, wrapper) && canMove(target)) { return 'LabelDrag'; } return 'LabelSelect';
     }
     if (obj !== null) {
         if (obj instanceof Node || obj instanceof Connector) {
@@ -118,7 +117,7 @@ export function findToolToActivate(
             if (canMove(obj) && wrapper instanceof TextElement && wrapper.hyperlink.link) {
                 return 'Hyperlink';
             }
-            if (canMove(obj) && isSelected(diagram, obj, false)) {
+            if (canMove(obj) && isSelected(diagram, obj, false) && (diagram.selectedItems as Selector).annotation === undefined) {
                 if ((obj instanceof Connector && !(contains(position, obj.sourcePoint, obj.hitPadding) ||
                     contains(position, obj.targetPoint, obj.hitPadding))) ||
                     !(obj instanceof Connector)) { return 'Drag'; }
@@ -202,46 +201,43 @@ export function findPortToolToActivate(
 
 function checkForResizeHandles(
     diagram: Diagram, element: DiagramElement, position: PointModel, matrix: Matrix, x: number, y: number): Actions {
-    let node: NodeModel = diagram.selectedItems.nodes[0];
     let forty: number = 40 / diagram.scroller.currentZoom;
     let ten: number = 10 / diagram.scroller.currentZoom;
     let selectedItems: Selector = diagram.selectedItems as Selector;
+    let labelSelection: boolean = (selectedItems.annotation) ? true : false;
     if (element.actualSize.width >= forty && element.actualSize.height >= forty) {
-        if (canResizeCorner(selectedItems.constraints, 'ResizeSouthEast', selectedItems.thumbsConstraints) && contains(
+        if (canResizeCorner(selectedItems.constraints, 'ResizeSouthEast', selectedItems.thumbsConstraints, selectedItems) && contains(
             position, transformPointByMatrix(matrix, { x: x + element.actualSize.width, y: y + element.actualSize.height }), ten)) {
-            return 'ResizeSouthEast';
+            return (labelSelection) ? 'LabelResizeSouthEast' : 'ResizeSouthEast';
         }
-        if (canResizeCorner(selectedItems.constraints, 'ResizeSouthWest', selectedItems.thumbsConstraints) &&
+        if (canResizeCorner(selectedItems.constraints, 'ResizeSouthWest', selectedItems.thumbsConstraints, selectedItems) &&
             contains(position, transformPointByMatrix(matrix, { x: x, y: y + element.actualSize.height }), ten)) {
-            return 'ResizeSouthWest';
+            return (labelSelection) ? 'LabelResizeSouthWest' : 'ResizeSouthWest';
         }
-        if (canResizeCorner(selectedItems.constraints, 'ResizeNorthEast', selectedItems.thumbsConstraints) &&
+        if (canResizeCorner(selectedItems.constraints, 'ResizeNorthEast', selectedItems.thumbsConstraints, selectedItems) &&
             contains(position, transformPointByMatrix(matrix, { x: x + element.actualSize.width, y: y }), ten)) {
-            return 'ResizeNorthEast';
+            return (labelSelection) ? 'LabelResizeNorthEast' : 'ResizeNorthEast';
         }
-        if (canResizeCorner(selectedItems.constraints, 'ResizeNorthWest', selectedItems.thumbsConstraints) &&
+        if (canResizeCorner(selectedItems.constraints, 'ResizeNorthWest', selectedItems.thumbsConstraints, selectedItems) &&
             contains(position, transformPointByMatrix(matrix, { x: x, y: y }), ten)) {
-            return 'ResizeNorthWest';
+            return (labelSelection) ? 'LabelResizeNorthWest' : 'ResizeNorthWest';
         }
     }
-    if (canResizeCorner(selectedItems.constraints, 'ResizeEast', selectedItems.thumbsConstraints) && contains(
-        position,
-        transformPointByMatrix(matrix, { x: x + element.actualSize.width, y: y + element.actualSize.height / 2 }), ten)) {
-        return 'ResizeEast';
+    if (canResizeCorner(selectedItems.constraints, 'ResizeEast', selectedItems.thumbsConstraints, selectedItems) && contains(
+        position, transformPointByMatrix(matrix, { x: x + element.actualSize.width, y: y + element.actualSize.height / 2 }), ten)) {
+        return (labelSelection) ? 'LabelResizeEast' : 'ResizeEast';
     }
-    if (canResizeCorner(selectedItems.constraints, 'ResizeWest', selectedItems.thumbsConstraints) &&
+    if (canResizeCorner(selectedItems.constraints, 'ResizeWest', selectedItems.thumbsConstraints, selectedItems) &&
         contains(position, transformPointByMatrix(matrix, { x: x, y: y + element.actualSize.height / 2 }), ten)) {
-        return 'ResizeWest';
+        return (labelSelection) ? 'LabelResizeWest' : 'ResizeWest';
     }
-    if (canResizeCorner(selectedItems.constraints, 'ResizeSouth', selectedItems.thumbsConstraints) &&
-        contains(
-            position,
-            transformPointByMatrix(matrix, { x: x + element.actualSize.width / 2, y: y + element.actualSize.height }), ten)) {
-        return 'ResizeSouth';
+    if (canResizeCorner(selectedItems.constraints, 'ResizeSouth', selectedItems.thumbsConstraints, selectedItems) && contains(
+        position, transformPointByMatrix(matrix, { x: x + element.actualSize.width / 2, y: y + element.actualSize.height }), ten)) {
+        return (labelSelection) ? 'LabelResizeSouth' : 'ResizeSouth';
     }
-    if (canResizeCorner(selectedItems.constraints, 'ResizeNorth', selectedItems.thumbsConstraints) &&
+    if (canResizeCorner(selectedItems.constraints, 'ResizeNorth', selectedItems.thumbsConstraints, selectedItems) &&
         contains(position, transformPointByMatrix(matrix, { x: x + element.actualSize.width / 2, y: y }), ten)) {
-        return 'ResizeNorth';
+        return (labelSelection) ? 'LabelResizeNorth' : 'ResizeNorth';
     }
     return null;
 }
@@ -274,13 +270,13 @@ export function hasSingleConnection(diagram: Diagram): boolean {
 }
 
 /** @private */
-export function isSelected(diagram: Diagram, element: Object, firstLevel: boolean = true): boolean {
+export function isSelected(diagram: Diagram, element: Object, firstLevel: boolean = true, wrapper?: DiagramElement): boolean {
     if (element instanceof Selector) {
         return true;
     }
     if (element instanceof Node) {
         while (element) {
-            if (diagram.selectedItems.nodes.indexOf(element) !== -1) {
+            if (diagram.selectedItems.nodes.indexOf(element) !== -1 && (diagram.selectedItems as Selector).annotation === undefined) {
                 return true;
             }
             if (!firstLevel) {
@@ -291,7 +287,11 @@ export function isSelected(diagram: Diagram, element: Object, firstLevel: boolea
         }
 
     } else if (element instanceof Connector) {
-        if (diagram.selectedItems.connectors.indexOf(element) !== -1) {
+        if (diagram.selectedItems.connectors.indexOf(element) !== -1 && (diagram.selectedItems as Selector).annotation === undefined) {
+            return true;
+        }
+    } else if (element instanceof ShapeAnnotation || element instanceof PathAnnotation) {
+        if ((diagram.selectedItems as Selector).annotation && diagram.selectedItems.wrapper.children[0].id === wrapper.id) {
             return true;
         }
     }
@@ -303,7 +303,8 @@ export type Actions = 'None' | 'Select' | 'Drag' | 'ResizeWest' | 'ConnectorSour
     'ResizeEast' | 'ResizeSouth' | 'ResizeNorth' | 'ResizeSouthEast' |
     'ResizeSouthWest' | 'ResizeNorthEast' | 'ResizeNorthWest' | 'Rotate' | 'ConnectorEnd' | 'Custom' | 'Draw' | 'Pan' |
     'BezierSourceThumb' | 'BezierTargetThumb' | 'LayoutAnimation' | 'PinchZoom' | 'Hyperlink' | 'SegmentEnd' | 'OrthoThumb' |
-    'PortDrag' | 'PortDraw';
+    'PortDrag' | 'PortDraw' | 'LabelSelect' | 'LabelDrag' | 'LabelResizeSouthEast' | 'LabelResizeSouthWest' | 'LabelResizeNorthEast' |
+    'LabelResizeNorthWest' | 'LabelResizeSouth' | 'LabelResizeNorth' | 'LabelResizeWest' | 'LabelResizeEast' | 'LabelRotate';
 
 /** @private */
 export function getCursor(cursor: Actions, angle: number): string {
@@ -375,5 +376,16 @@ let cursors: Object = {
     'SegmentEnd': 'move',
     'Pan': 'pointer',
     'Hyperlink': 'pointer',
-    'PortDrag': 'pointer'
+    'PortDrag': 'pointer',
+    'LabelSelect': 'pointer',
+    'LabelDrag': 'move',
+    'LabelRotate': 'crosshair',
+    'LabelResizeWest': 'w-resize',
+    'LabelResizeEast': 'e-resize',
+    'LabelResizeSouth': 's-resize',
+    'LabelResizeNorth': 'n-resize',
+    'LabelResizeNorthEast': 'ne-resize',
+    'LabelResizeNorthWest': 'nw-resize',
+    'LabelResizeSouthEast': 'se-resize',
+    'LabelResizeSouthWest': 'sw-resize',
 };

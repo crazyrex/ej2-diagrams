@@ -8,7 +8,7 @@ import { BaseAttributes, LineAttributes, CircleAttributes, SubTextElement, TextB
 import { LinearGradientModel, RadialGradientModel, StopModel } from './../core/appearance-model';
 import { IRenderer } from './../rendering/IRenderer';
 import { setAttributeSvg } from './../utility/dom-util';
-import { overFlow, wordBreakToString } from './../utility/base-util';
+import { overFlow, wordBreakToString, cornersPointsBeforeRotation } from './../utility/base-util';
 import { CanvasRenderer } from './../rendering/canvas-renderer';
 import { DiagramNativeElement } from '../core/elements/native-element';
 import { DiagramHtmlElement } from '../core/elements/html-element';
@@ -364,7 +364,7 @@ export class SvgRenderer implements IRenderer {
     }
 
     /** @private */
-    public drawHTMLContent(element: DiagramHtmlElement, canvas: HTMLElement, transform?: Transforms): void {
+    public drawHTMLContent(element: DiagramHtmlElement, canvas: HTMLElement, transform?: Transforms, value?: boolean): void {
         let htmlElement: HTMLElement;
         if (canvas) {
             let i: number;
@@ -383,11 +383,13 @@ export class SvgRenderer implements IRenderer {
             htmlElement.appendChild(element.template.cloneNode(true));
             canvas.appendChild(htmlElement);
         }
+        let point: PointModel = cornersPointsBeforeRotation(element).topLeft;
         htmlElement.setAttribute(
             'style', 'height:' + (element.actualSize.height) + 'px; width:' + (element.actualSize.width) +
-            'px;left:' + (element.corners.x) + 'px; top:' + ((element.corners.y)) + 'px;' +
+            'px;left:' + point.x + 'px; top:' + point.y + 'px;' +
             'position:absolute;transform:rotate(' + element.parentTransform + 'deg);' +
-            'pointer-events:all;visibility:' + ((element.visible) ? 'visible' : 'hidden') + ';'
+            'pointer-events:' + (value ? 'all' : 'none')
+            + ';visibility:' + ((element.visible) ? 'visible' : 'hidden') + ';opacity:' + element.style.opacity + ';'
         );
     }
 
@@ -410,7 +412,8 @@ export class SvgRenderer implements IRenderer {
         if (clipPath) {
             nativeElement.removeChild(clipPath);
         }
-        nativeElement.setAttribute('style', 'visibility:' + ((element.visible) ? 'visible' : 'hidden') + ';');
+        nativeElement.setAttribute('style', 'visibility:' +
+            ((element.visible) ? 'visible' : 'hidden') + ';opacity:' + element.style.opacity + ';');
         this.setNativTransform(element, nativeElement, height, width);
         if (element.scale === 'Slice') {
             this.drawClipPath(element, nativeElement, height, width, parentSvg);
@@ -549,7 +552,7 @@ export class SvgRenderer implements IRenderer {
         if (style.stroke) {
             svg.setAttribute('stroke', style.stroke);
         }
-        if (style.strokeWidth !== undefined) {
+        if (style.strokeWidth !== undefined && style.strokeWidth !== null) {
             svg.setAttribute('stroke-width', style.strokeWidth.toString());
         }
         if (dashArray) {
@@ -566,8 +569,8 @@ export class SvgRenderer implements IRenderer {
     // text utility
 
     public svgLabelAlign(text: TextAttributes, wrapBound: TextBounds, childNodes: SubTextElement[]): PointModel {
-        let bounds: Size = new Size(wrapBound.width, childNodes.length * (text.fontSize));
-        let pos: PointModel = { x: 0, y: 0 }; let x: number = 0; let y: number = 0;
+        let bounds: Size = new Size(wrapBound.width, childNodes.length * (text.fontSize * 1.2));
+        let pos: PointModel = { x: 0, y: 0 }; let x: number = 0; let y: number = 1.2;
         let offsetX: number = text.width * 0.5; let offsety: number = text.height * 0.5;
         let pointX: number = offsetX; let pointY: number = offsety;
         if (text.textAlign === 'left') {

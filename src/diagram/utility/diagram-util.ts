@@ -2,12 +2,12 @@ import { Size } from './../primitives/size';
 import { PointModel } from './../primitives/point-model';
 import { Rect } from './../primitives/rect';
 import { identityMatrix, rotateMatrix, transformPointByMatrix, Matrix, scaleMatrix } from './../primitives/matrix';
-import { DiagramElement } from './../core/elements/diagram-element';
+import { DiagramElement, Corners } from './../core/elements/diagram-element';
 import { Container } from './../core/containers/container';
 import { StrokeStyle } from './../core/appearance';
 import { TextStyleModel } from './../core/appearance-model';
 import { Point } from './../primitives/point';
-import { PortVisibility, ConnectorConstraints, NodeConstraints } from './../enum/enum';
+import { PortVisibility, ConnectorConstraints, NodeConstraints, Shapes } from './../enum/enum';
 import { FlowShapes, SelectorConstraints, ThumbsConstraints } from './../enum/enum';
 import { Alignment, SegmentInfo } from '../rendering/canvas-interface';
 import { PathElement } from './../core/elements/path-element';
@@ -24,19 +24,22 @@ import { DecoratorModel } from './../objects/connector-model';
 import { getBasicShape } from './../objects/dictionary/basic-shapes';
 import { getFlowShape } from './../objects/dictionary/flow-shapes';
 import { Diagram } from './../diagram';
-import { Segment, Intersection } from './connector';
+import { Intersection } from './connector';
 import { SelectorModel, UserHandleModel } from '../interaction/selector-model';
 import { MarginModel } from '../core/appearance-model';
 import { PointPortModel } from './../objects/port-model';
 import { ShapeAnnotationModel, PathAnnotationModel, HyperlinkModel, AnnotationModel } from './../objects/annotation-model';
-import { getContent, removeElement } from './dom-util';
+import { getContent, removeElement, hasClass, getDiagramElement } from './dom-util';
 import { getBounds, cloneObject, rotatePoint, getFunction } from './base-util';
 import { getPolygonPath } from './../utility/path-util';
 import { DiagramHtmlElement } from '../core/elements/html-element';
 import { getRulerSize } from '../ruler/ruler';
 import { View } from '../objects/interface/interfaces';
-import { TransformFactor as Transforms } from '../interaction/scroller';
+import { TransformFactor as Transforms, Segment } from '../interaction/scroller';
 import { SymbolPalette } from '../../symbol-palette/symbol-palette';
+import { canResize } from './constraints-util';
+import { Selector } from '../interaction/selector';
+import { contains } from '../interaction/actions';
 
 
 
@@ -113,6 +116,34 @@ function pointsForBezier(connector: ConnectorModel): PointModel[] {
     return points;
 }
 
+export function isDiagramChild(htmlLayer: HTMLElement): boolean {
+    let element: HTMLElement = htmlLayer.parentElement;
+    do {
+        if (hasClass(element, 'e-diagram')) {
+            return true;
+        }
+        element = element.parentElement;
+    }
+    while (element);
+    return false;
+}
+
+export function groupHasType(node: NodeModel, type: Shapes, nameTable: {}): boolean {
+    let contains: boolean = false;
+    if (node && node.children && node.children.length > 0) {
+        let child: Node;
+        let i: number = 0;
+        for (; i < node.children.length; i++) {
+            child = nameTable[node.children[i]];
+            if (child.shape.type === type) {
+                return true;
+            }
+            return groupHasType(child, type, nameTable);
+        }
+    }
+    return contains;
+}
+
 /** @private */
 export function isPointOverConnector(connector: ConnectorModel, reference: PointModel): boolean {
     let intermediatePoints: PointModel[];
@@ -126,8 +157,8 @@ export function isPointOverConnector(connector: ConnectorModel, reference: Point
 
         if (rect.containsPoint(reference)) {
             let intersectinPt: PointModel = findNearestPoint(reference, start, end);
-            let segment1: Segment = { X1: start.x, X2: end.x, Y1: start.y, Y2: end.y };
-            let segment2: Segment = { X1: reference.x, X2: intersectinPt.x, Y1: reference.y, Y2: intersectinPt.y };
+            let segment1: Segment = { x1: start.x, x2: end.x, y1: start.y, y2: end.y };
+            let segment2: Segment = { x1: reference.x, x2: intersectinPt.x, y1: reference.y, y2: intersectinPt.y };
             let intersectDetails: Intersection = intersect3(segment1, segment2);
             if (intersectDetails.enabled) {
                 let distance: number = Point.findLength(reference, intersectDetails.intersectPt);
@@ -146,6 +177,15 @@ export function isPointOverConnector(connector: ConnectorModel, reference: Point
             }
         }
     }
+    if (connector.annotations.length > 0) {
+        let container: DiagramElement[] = connector.wrapper.children;
+        for (let i: number = 3; i < container.length; i++) {
+            let textElement: DiagramElement = container[i];
+            if (textElement.bounds.containsPoint(reference)) {
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -154,41 +194,29 @@ export function intersect3(lineUtil1: Segment, lineUtil2: Segment): Intersection
     let point: PointModel = { x: 0, y: 0 };
     let l1: Segment = lineUtil1;
     let l2: Segment = lineUtil2;
-    let d: number = (l2.Y2 - l2.Y1) * (l1.X2 - l1.X1) - (l2.X2 - l2.X1) * (l1.Y2 - l1.Y1);
-    let na: number = (l2.X2 - l2.X1) * (l1.Y1 - l2.Y1) - (l2.Y2 - l2.Y1) * (l1.X1 - l2.X1);
-    let nb: number = (l1.X2 - l1.X1) * (l1.Y1 - l2.Y1) - (l1.Y2 - l1.Y1) * (l1.X1 - l2.X1);
+    let d: number = (l2.y2 - l2.y1) * (l1.x2 - l1.x1) - (l2.x2 - l2.x1) * (l1.y2 - l1.y1);
+    let na: number = (l2.x2 - l2.x1) * (l1.y1 - l2.y1) - (l2.y2 - l2.y1) * (l1.x1 - l2.x1);
+    let nb: number = (l1.x2 - l1.x1) * (l1.y1 - l2.y1) - (l1.y2 - l1.y1) * (l1.x1 - l2.x1);
     if (d === 0) {
         return { enabled: false, intersectPt: point };
     }
     let ua: number = na / d;
     let ub: number = nb / d;
     if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
-        point.x = l1.X1 + (ua * (l1.X2 - l1.X1));
-        point.y = l1.Y1 + (ua * (l1.Y2 - l1.Y1));
+        point.x = l1.x1 + (ua * (l1.x2 - l1.x1));
+        point.y = l1.y1 + (ua * (l1.y2 - l1.y1));
         return { enabled: true, intersectPt: point };
     }
     return { enabled: false, intersectPt: point };
 }
 
 /** @private */
-export function getPoints(element: DiagramElement, corners: Rect): PointModel[] {
+export function getPoints(element: DiagramElement, corners: Corners): PointModel[] {
     let line: PointModel[] = [];
-    let X1: PointModel = corners.topLeft;
-    let X2: PointModel = corners.topRight;
-    let Y1: PointModel = corners.bottomRight;
-    let Y2: PointModel = corners.bottomLeft;
-    if (element.rotateAngle !== 0 || element.parentTransform !== 0) {
-        let matrix: Matrix = identityMatrix();
-        rotateMatrix(matrix, element.rotateAngle + element.parentTransform, element.offsetX, element.offsetY);
-        X1 = transformPointByMatrix(matrix, X1);
-        X2 = transformPointByMatrix(matrix, X2);
-        Y1 = transformPointByMatrix(matrix, Y1);
-        Y2 = transformPointByMatrix(matrix, Y2);
-    }
-    line.push(X1);
-    line.push(X2);
-    line.push(Y1);
-    line.push(Y2);
+    line.push(corners.topLeft);
+    line.push(corners.topRight);
+    line.push(corners.bottomRight);
+    line.push(corners.bottomLeft);
     return line;
 }
 
@@ -217,7 +245,7 @@ function tooltipOffset(node: NodeModel | ConnectorModel, mousePosition: PointMod
     let point: PointModel = {};
     let scale: number = diagram.scroller.transform.scale;
     let element: HTMLElement = document.getElementById(diagram.element.id);
-    let bounds: Rect = node.wrapper.outerBounds;
+    let bounds: Rect = node.wrapper.bounds;
     let rect: Rect = element.getBoundingClientRect() as Rect;
     let horizontalOffset: number = diagram.scroller.horizontalOffset;
     let verticalOffset: number = diagram.scroller.verticalOffset;
@@ -397,6 +425,9 @@ export function getBezierDirection(src: PointModel, tar: PointModel): string {
 /** @private */
 export function serialize(model: Diagram): string {
     let clonedObject: Object = cloneObject(model, model.getCustomProperty);
+    (clonedObject as Diagram).selectedItems.nodes = [];
+    (clonedObject as Diagram).selectedItems.connectors = [];
+    (clonedObject as Diagram).selectedItems.wrapper = null;
     return JSON.stringify(clonedObject);
 }
 
@@ -474,28 +505,11 @@ export function deserialize(model: string, diagram: Diagram): Object {
             diagram.element.classList.add('e-diagram');
         }
     }
-
-    let selectedNodes: NodeModel[] = getCollection(dataObj.selectedItems.nodes, diagram.nodes) as NodeModel[];
-    let selcectedConnectors: ConnectorModel[] = getCollection(dataObj.selectedItems.connectors, diagram.connectors) as ConnectorModel[];
-    let selectedItems: (NodeModel | ConnectorModel)[] = [];
-    selectedItems = selectedItems.concat(selectedNodes).concat(selcectedConnectors);
-    diagram.select(selectedItems);
+    dataObj.selectedItems.nodes = [];
+    dataObj.selectedItems.connectors = [];
+    diagram.selectedItems = dataObj.selectedItems;
     return dataObj;
 }
-function getCollection(
-    objNodes: (NodeModel | ConnectorModel)[], diagramNodes: (NodeModel | ConnectorModel)[]
-): (NodeModel | ConnectorModel)[] {
-    let collection: (NodeModel | ConnectorModel)[] = [];
-    for (let i: number = 0; i < objNodes.length; i++) {
-        for (let connectors of diagramNodes) {
-            if (connectors.id === objNodes[i].id) {
-                collection.push(connectors);
-            }
-        }
-    }
-    return collection;
-}
-
 
 /** @private */
 export function updateStyle(changedObject: TextStyleModel, target: DiagramElement): void {
@@ -677,7 +691,7 @@ export function updateShape(node: Node, actualObject: Node, oldObject: Node, dia
             updateShapeContent(content, actualObject, diagram);
     }
     if (node.shape.type === undefined || node.shape.type === oldObject.shape.type) {
-        updateContent(node, actualObject);
+        updateContent(node, actualObject, diagram);
     } else {
         content.width = actualObject.wrapper.children[0].width;
         content.height = actualObject.wrapper.children[0].height;
@@ -689,7 +703,7 @@ export function updateShape(node: Node, actualObject: Node, oldObject: Node, dia
     }
 }
 /** @private */
-export function updateContent(newValues: Node, actualObject: Node): void {
+export function updateContent(newValues: Node, actualObject: Node, diagram: Diagram): void {
     if (Object.keys(newValues.shape).length > 0) {
         if (actualObject.shape.type === 'Path' && (newValues.shape as PathModel).data !== undefined) {
             (actualObject.wrapper.children[0] as PathModel).data = (newValues.shape as PathModel).data;
@@ -698,20 +712,26 @@ export function updateContent(newValues: Node, actualObject: Node): void {
         } else if (actualObject.shape.type === 'Image' && (newValues.shape as ImageModel).source !== undefined) {
             (actualObject.wrapper.children[0] as ImageModel).source = (newValues.shape as ImageModel).source;
         } else if (actualObject.shape.type === 'Native') {
-            let nativeElement: HTMLElement = document.getElementById(actualObject.wrapper.children[0].id + '_groupElement');
-            if ((newValues.shape as NativeModel).content !== undefined && nativeElement) {
-                nativeElement.removeChild(nativeElement.children[0]);
-                (actualObject.wrapper.children[0] as DiagramNativeElement).content = (newValues.shape as NativeModel).content;
-                nativeElement.appendChild(getContent(actualObject.wrapper.children[0] as DiagramNativeElement, false));
+            let nativeElement: HTMLElement;
+            for (let i: number = 0; i < diagram.views.length; i++) {
+                nativeElement = getDiagramElement(actualObject.wrapper.children[0].id + '_groupElement', diagram.views[i]);
+                if ((newValues.shape as NativeModel).content !== undefined && nativeElement) {
+                    nativeElement.removeChild(nativeElement.children[0]);
+                    (actualObject.wrapper.children[0] as DiagramNativeElement).content = (newValues.shape as NativeModel).content;
+                    nativeElement.appendChild(getContent(actualObject.wrapper.children[0] as DiagramNativeElement, false));
+                }
             }
             (actualObject.wrapper.children[0] as NativeModel).scale = (newValues.shape as NativeModel).scale ?
                 (newValues.shape as NativeModel).scale : (actualObject.wrapper.children[0] as NativeModel).scale;
         } else if (actualObject.shape.type === 'HTML') {
-            let htmlElement: HTMLElement = document.getElementById(actualObject.wrapper.children[0].id + '_html_element');
-            if (htmlElement) {
-                htmlElement.removeChild(htmlElement.children[0]);
-                (actualObject.wrapper.children[0] as DiagramHtmlElement).content = (newValues.shape as HtmlModel).content;
-                htmlElement.appendChild(getContent(actualObject.wrapper.children[0] as DiagramHtmlElement, true));
+            let htmlElement: HTMLElement;
+            for (let i: number = 0; i < diagram.views.length; i++) {
+                htmlElement = getDiagramElement(actualObject.wrapper.children[0].id + '_html_element', diagram.views[i]);
+                if (htmlElement) {
+                    htmlElement.removeChild(htmlElement.children[0]);
+                    (actualObject.wrapper.children[0] as DiagramHtmlElement).content = (newValues.shape as HtmlModel).content;
+                    htmlElement.appendChild(getContent(actualObject.wrapper.children[0] as DiagramHtmlElement, true));
+                }
             }
         } else if (actualObject.shape.type === 'Flow' && (newValues.shape as FlowShapeModel).shape !== undefined) {
             (actualObject.shape as FlowShapeModel).shape = (newValues.shape as FlowShapeModel).shape;
@@ -827,8 +847,11 @@ export function getUserHandlePosition(selectorItem: SelectorModel, handle: UserH
 }
 
 /** @private */
-export function canResizeCorner(selectorConstraints: SelectorConstraints, action: string, thumbsConstraints: ThumbsConstraints): boolean {
-    if ((SelectorConstraints[action] & selectorConstraints) && (ThumbsConstraints[action] & thumbsConstraints)) {
+export function canResizeCorner(
+    selectorConstraints: SelectorConstraints, action: string, thumbsConstraints: ThumbsConstraints, selectedItems: Selector): boolean {
+    if (selectedItems.annotation) {
+        if (canResize(selectedItems.annotation)) { return true; }
+    } else if ((SelectorConstraints[action] & selectorConstraints) && (ThumbsConstraints[action] & thumbsConstraints)) {
         return true;
     }
     return false;
@@ -865,10 +888,25 @@ export function findAnnotation(node: NodeModel | ConnectorModel, id: string): Sh
     return annotation;
 }
 
-export function findPortIndex(node: NodeModel, id: string): string {
-    let index: number;
+/** @private */
+export function findPort(node: NodeModel | ConnectorModel, id: string): PointPortModel {
+    let port: PointPortModel;
+    let portId: string[] = id.split('_');
+    id = portId[portId.length - 1];
     for (let i: number = 0; i < node.ports.length; i++) {
-        if (node.ports[i].id === id) {
+        if (id === node.ports[i].id) {
+            return node.ports[i];
+        }
+    }
+    return port;
+}
+
+/** @private */
+export function findObjectIndex(node: NodeModel | ConnectorModel, id: string, annotation?: boolean): string {
+    let index: number;
+    let collection: (PointPortModel | ShapeAnnotationModel | PathAnnotationModel)[] = (annotation) ? node.annotations : node.ports;
+    for (let i: number = 0; i < collection.length; i++) {
+        if (collection[i].id === id) {
             return (i).toString();
         }
     }
@@ -913,6 +951,34 @@ export function scaleElement(element: DiagramElement, sw: number, sh: number, re
                     child.offsetX = newPosition.x;
                     child.offsetY = newPosition.y;
                     scaleElement(child, sw, sh, refObject);
+                }
+            }
+        }
+    }
+}
+export function arrangeChild(obj: Node, x: number, y: number, nameTable: {}, drop: boolean, diagram: Diagram | SymbolPalette): void {
+    let child: string[] = obj.children;
+    let node: Node;
+    for (let i: number = 0; i < child.length; i++) {
+        node = nameTable[child[i]];
+        if (node) {
+            if (node.children) {
+                this.arrangeChild(node, x, y, nameTable, drop, diagram);
+            } else {
+                node.offsetX -= x;
+                node.offsetY -= y;
+                if (!drop) {
+                    let content: DiagramElement;
+                    let container: Container;
+                    nameTable[node.id] = node;
+                    container = node.initContainer();
+                    if (!container.children) {
+                        container.children = [];
+                    }
+                    content = node.init(diagram);
+                    container.children.push(content);
+                    container.measure(new Size(node.width, node.height));
+                    container.arrange(container.desiredSize);
                 }
             }
         }
@@ -967,8 +1033,13 @@ export function getElement(element: DiagramHtmlElement | DiagramNativeElement): 
             return nodes[i];
         }
     }
-    if (diagramElement[instance][0].enterObject && diagramElement[instance][0].enterObject === element.nodeId) {
-        return diagramElement[instance][0].enterObject;
+    let enterObject: {} = diagramElement[instance][0].enterObject;
+    if (enterObject && (enterObject['id'] === element.nodeId || enterObject['children'])) {
+        if (enterObject['children'] && groupHasType(enterObject as Node, 'HTML', diagramElement[instance][0].enterTable)) {
+            return diagramElement[instance][0].enterTable[element.nodeId];
+        } else {
+            return enterObject;
+        }
     }
     return null;
 }

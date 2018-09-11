@@ -12,7 +12,6 @@ import { wordBreakToString, whiteSpaceToString, textAlignToString } from '../uti
 import { getUserHandlePosition, canShowCorner } from '../utility/diagram-util';
 import { getDiagramElement, getAdornerLayer, getGridLayer, getHTMLLayer } from '../utility/dom-util';
 import { measurePath, getBackgroundLayerSvg, getBackgroundImageLayer, setAttributeSvg } from '../utility/dom-util';
-import { getDiagramLayer, getExpandCollapseLayer, getPortsLayer, getNativeLayer } from '../utility/dom-util';
 import { SnapSettingsModel } from '../../diagram/diagram/grid-lines-model';
 import { Gridlines } from '../../diagram/diagram/grid-lines';
 import { BackgroundModel } from '../../diagram/diagram/page-settings-model';
@@ -26,6 +25,7 @@ import { IRenderer } from './../rendering/IRenderer';
 import { SvgRenderer } from './svg-renderer';
 import { CanvasRenderer } from './canvas-renderer';
 import { processPathData, splitArrayCollection, transformPath } from '../utility/path-util';
+import {isDiagramChild } from '../utility/diagram-util';
 import { DiagramNativeElement } from '../core/elements/native-element';
 import { DiagramHtmlElement } from '../core/elements/html-element';
 import { BezierSegment, StraightSegment, OrthogonalSegment } from '../objects/connector';
@@ -40,13 +40,16 @@ import { RulerModel, Ruler } from '../../ruler';
 export class DiagramRenderer {
     public renderer: IRenderer = null;
     private diagramId: string;
+    /** @private */
     public isSvgMode: Boolean = true;
     private svgRenderer: SvgRenderer;
     private nativeSvgLayer: SVGSVGElement;
     private diagramSvgLayer: SVGSVGElement;
     private iconSvgLayer: SVGSVGElement;
-    private adornerSvgLayer: SVGSVGElement;
+    /** @private */
+    public adornerSvgLayer: SVGSVGElement;
     private element: HTMLElement;
+    private transform: PointModel = { x: 0, y: 0 };
     constructor(name: string, svgRender: IRenderer, isSvgMode: Boolean) {
         this.diagramId = name;
         this.element = getDiagramElement(this.diagramId);
@@ -216,7 +219,7 @@ export class DiagramRenderer {
         let nodeWidth: number = element.actualSize.width * currentZoom;
         let nodeHeight: number = element.actualSize.height * currentZoom;
 
-        if (nodeWidth >= 40 && nodeHeight >= 40 ) {
+        if (nodeWidth >= 40 && nodeHeight >= 40) {
 
             //Hide corners when the size is less than 40
             if (selectorConstraints & SelectorConstraints.ResizeNorthWest) {
@@ -590,7 +593,7 @@ export class DiagramRenderer {
         let options: PathAttributes = {
             x: newPoint.x,
             y: newPoint.y,
-            angle: wrapper.rotateAngle,
+            angle: wrapper.rotateAngle + wrapper.parentTransform,
             fill: '#231f20', stroke: 'black', strokeWidth: 0.5, dashArray: '', data: data,
             width: 20, height: 20, pivotX: 0, pivotY: 0, opacity: 1, visible: visible, id: wrapper.id, class: 'e-diagram-rotate-handle'
         };
@@ -824,7 +827,6 @@ export class DiagramRenderer {
 
         let options: BaseAttributes = this.getBaseAttributes(element, transform);
         (options as RectAttributes).cornerRadius = 0;
-        this.renderer.drawRectangle(canvas, options as RectAttributes, this.diagramId, undefined, undefined, parentSvg);
         (options as TextAttributes).whiteSpace = whiteSpaceToString(element.style.whiteSpace, element.style.textWrapping);
         (options as TextAttributes).content = element.content;
         (options as TextAttributes).breakWord = wordBreakToString(element.style.textWrapping);
@@ -839,8 +841,9 @@ export class DiagramRenderer {
         (options as TextAttributes).doWrap = element.doWrap;
         (options as TextAttributes).wrapBounds = element.wrapBounds;
         (options as TextAttributes).childNodes = element.childNodes;
-        options.dashArray = ''; options.strokeWidth = 0; options.fill = '';
+        options.dashArray = ''; options.strokeWidth = 0; options.fill = 'transparent';
         let ariaLabel: Object = element.description ? element.description : element.content ? element.content : element.id;
+        this.renderer.drawRectangle(canvas, options as RectAttributes, this.diagramId, undefined, undefined, parentSvg);
         this.renderer.drawText(canvas, options as TextAttributes, parentSvg, ariaLabel, this.diagramId);
         if (this.isSvgMode) {
             element.doWrap = false;
@@ -896,7 +899,8 @@ export class DiagramRenderer {
         (options as RectAttributes).stroke = 'transparent';
         this.renderer.drawRectangle(canvas, options as RectAttributes, this.diagramId, undefined, undefined, parentSvg);
         if (this.svgRenderer) {
-            this.svgRenderer.drawHTMLContent(element, htmlLayer.children[0] as HTMLElement, transform);
+            this.svgRenderer.drawHTMLContent(
+                element, htmlLayer.children[0] as HTMLElement, transform, isDiagramChild(htmlLayer));
         }
     }
 
@@ -1074,43 +1078,53 @@ export class DiagramRenderer {
         }
     }
 
-    public transformLayers(
-        transform: Transforms, svgMode: boolean): void {
-        //diagram layer
-        if (svgMode) {
-            let diagramLayer: SVGElement = getDiagramLayer(this.diagramId);
-            diagramLayer.setAttribute('transform', 'translate('
+    public transformLayers(transform: Transforms, svgMode: boolean): boolean {
+
+        let tx: number = transform.tx * transform.scale;
+        let ty: number = transform.ty * transform.scale;
+
+        if (tx !== this.transform.x || ty !== this.transform.y || (tx === 0 || ty === 0)) {
+            //diagram layer
+            if (svgMode) {
+                let diagramLayer: SVGElement = this.diagramSvgLayer.getElementById(this.diagramId + '_diagramLayer') as SVGElement;
+                diagramLayer.setAttribute('transform', 'translate('
+                    + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
+                    + transform.scale + ')');
+            }
+            //background
+            //gridline
+            let gridLayer: SVGElement = getGridLayer(this.diagramId);
+            gridLayer.setAttribute('transform', 'translate(' + (transform.tx * transform.scale) + ','
+                + (transform.ty * transform.scale) + ')');
+
+            //portslayer    
+            let portsLayer: SVGElement = this.iconSvgLayer.getElementById(this.diagramId + '_diagramPorts') as SVGElement;
+            portsLayer.setAttribute('transform', 'translate('
                 + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
                 + transform.scale + ')');
+            //expandlayer
+            let expandLayer: SVGElement = this.iconSvgLayer.getElementById(this.diagramId + '_diagramExpander') as SVGElement;
+            expandLayer.setAttribute('transform', 'translate('
+                + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
+                + transform.scale + ')');
+            //nativelayer
+            let nativeLayer: SVGElement = this.nativeSvgLayer.getElementById(this.diagramId + '_nativeLayer') as SVGElement;
+            nativeLayer.setAttribute('transform', 'translate('
+                + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
+                + transform.scale + ')');
+
+            //htmlLayer
+            let htmlLayer: HTMLElement = getHTMLLayer(this.diagramId).children[0] as HTMLElement;
+
+            htmlLayer.style.transform = 'translate('
+                + (transform.tx * transform.scale) + 'px,' + (transform.ty * transform.scale) + 'px)scale('
+                + transform.scale + ')';
+            this.transform = { x: transform.tx * transform.scale, y: transform.ty * transform.scale };
+            return true;
         }
-        //background
-        //gridline
-        let gridLayer: SVGElement = getGridLayer(this.diagramId);
-        gridLayer.setAttribute('transform', 'translate(' + (transform.tx * transform.scale) + ','
-            + (transform.ty * transform.scale) + ')');
-
-        //portslayer    
-        let portsLayer: SVGElement = getPortsLayer(this.diagramId);
-        portsLayer.setAttribute('transform', 'translate('
-            + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
-            + transform.scale + ')');
-        //expandlayer
-        let expandLayer: SVGElement = getExpandCollapseLayer(this.diagramId);
-        expandLayer.setAttribute('transform', 'translate('
-            + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
-            + transform.scale + ')');
-        //nativelayer
-        let nativeLayer: SVGElement = getNativeLayer(this.diagramId);
-        nativeLayer.setAttribute('transform', 'translate('
-            + (transform.tx * transform.scale) + ',' + (transform.ty * transform.scale) + '),scale('
-            + transform.scale + ')');
-
-        //htmlLayer
-        let htmlLayer: HTMLElement = getHTMLLayer(this.diagramId).children[0] as HTMLElement;
-        htmlLayer.style.transform = 'translate('
-            + (transform.tx * transform.scale) + 'px,' + (transform.ty * transform.scale) + 'px)scale('
-            + transform.scale + ')';
+        return false;
     }
+
 
     /** @private */
     public updateNode

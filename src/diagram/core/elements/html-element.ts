@@ -16,7 +16,6 @@ export class DiagramHtmlElement extends DiagramElement {
     private data: string | HTMLElement = '';
     public nodeId: string = '';
     public diagramId: string = '';
-
     /**
      * Gets or sets the geometry of the html element
      */

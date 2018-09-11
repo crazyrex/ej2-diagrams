@@ -106,7 +106,7 @@ export class Canvas extends Container {
                     if (child.relativeMode === 'Object') {
                         topLeft = this.alignChildBasedOnParent(child, childSize, desiredSize, childX, childY);
                     } else {
-                        topLeft = this.alignChildBasedOnaPoint(child, childX, childY);
+                        topLeft = this.alignChildBasedOnaPoint(child, childX, childY, childSize);
                     }
 
                     center = { x: topLeft.x + childSize.width / 2, y: topLeft.y + childSize.height / 2 };
@@ -169,31 +169,33 @@ export class Canvas extends Container {
      * @param x 
      * @param y 
      */
-    private alignChildBasedOnaPoint(child: DiagramElement, x: number, y: number): PointModel {
+    private alignChildBasedOnaPoint(child: DiagramElement, x: number, y: number, childSize: Size): PointModel {
+        x += child.margin.left - child.margin.right;
+        y += child.margin.top - child.margin.bottom;
         switch (child.horizontalAlignment) {
             case 'Auto':
             case 'Left':
-                x += child.margin.left;
+                x = x;
                 break;
             case 'Stretch':
             case 'Center':
-                x -= child.desiredSize.width * child.pivot.x;
+                x -= childSize.width * child.pivot.x;
                 break;
             case 'Right':
-                x -= child.desiredSize.width + child.margin.right;
+                x -= childSize.width;
                 break;
         }
         switch (child.verticalAlignment) {
             case 'Auto':
             case 'Top':
-                y += child.margin.top;
+                y = y;
                 break;
             case 'Stretch':
             case 'Center':
-                y -= child.desiredSize.height * child.pivot.y;
+                y -= childSize.height * child.pivot.y;
                 break;
             case 'Bottom':
-                y -= child.desiredSize.height + child.margin.bottom;
+                y -= childSize.height;
                 break;
         }
         return { x: x, y: y };

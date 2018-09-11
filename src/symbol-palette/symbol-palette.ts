@@ -1,6 +1,6 @@
 import { Component, Property, Complex, CollectionFactory, ChildProperty, Event } from '@syncfusion/ej2-base';
 import { Browser, EventHandler, Draggable, INotifyPropertyChanged, Collection, ModuleDeclaration } from '@syncfusion/ej2-base';
-import { remove, createElement, classList, EmitType } from '@syncfusion/ej2-base';
+import { remove, classList, EmitType } from '@syncfusion/ej2-base';
 import { Accordion, AccordionItemModel, ExpandMode, ExpandEventArgs } from '@syncfusion/ej2-navigations';
 import { NodeModel, ConnectorModel, Node, Connector, Shape, Size, Transform } from '../diagram/index';
 import { DiagramRenderer, Container, StackPanel, Margin, BpmnDiagrams } from '../diagram/index';
@@ -9,7 +9,7 @@ import { SymbolPaletteModel, SymbolPreviewModel, PaletteModel } from './symbol-p
 import { TextWrap, TextOverflow, IPaletteSelectionChangeArgs } from '../diagram/index';
 import { SvgRenderer } from '../diagram/rendering/svg-renderer';
 import { parentsUntil, createSvgElement, createHtmlElement, createMeasureElements } from '../diagram/utility/dom-util';
-import { scaleElement } from '../diagram/utility/diagram-util';
+import { scaleElement, arrangeChild, groupHasType } from '../diagram/utility/diagram-util';
 import { getFunction } from '../diagram/utility/base-util';
 import { getOuterBounds } from '../diagram/utility/connector';
 import { Point } from '../diagram/primitives/point';
@@ -29,7 +29,7 @@ let getObjectType: Function = (obj: Object): Object => {
 };
 
 /**
- * Defines the behavior of a palette
+ * A palette allows to display a group of related symbols and it textually annotates the group with its header.
  */
 export class Palette extends ChildProperty<Palette> {
     /**
@@ -48,21 +48,21 @@ export class Palette extends ChildProperty<Palette> {
     public height: number;
 
     /**
-     * Sets whether the symbol group is expanded or not
+     * Sets whether the palette items to be expanded or not
      * @default true
      */
     @Property(true)
     public expanded: boolean;
 
     /**
-     * Defines the content of the group icon
+     * Defines the content of the symbol group
      * @default ''
      */
     @Property('')
     public iconCss: string;
 
     /**
-     * Defines the title of the group icon
+     * Defines the title of the symbol group
      * @default ''
      */
     @Property('')
@@ -81,7 +81,7 @@ export class Palette extends ChildProperty<Palette> {
 }
 
 /**
- * Defines the size and position of the symbol palette
+ * customize the preview size and position of the individual palette items.
  */
 export class SymbolPreview extends ChildProperty<SymbolPreview> {
 
@@ -119,6 +119,10 @@ export class SymbolPreview extends ChildProperty<SymbolPreview> {
  * </script>
  * ```
  */
+/**
+ * The symbol palette control allows to predefine the frequently used nodes and connectors 
+ * and to drag and drop those nodes/connectors to drawing area
+ */
 export class SymbolPalette extends Component<HTMLElement> implements INotifyPropertyChanged {
 
     //public properties
@@ -155,6 +159,46 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
      * Defines the size, appearance and description of a symbol
      * @aspDefaultValueIgnore
      * @default undefined
+     */
+    /**
+     * ```html
+     * <div id="symbolpalette"></div>
+     *  ```
+     * ```typescript
+     * let palette: SymbolPalette = new SymbolPalette({
+     *   expandMode: 'Multiple',
+     *   palettes: [
+     *       { id: 'flow', expanded: false, symbols: getFlowShapes(), title: 'Flow Shapes' },
+     *   ],
+     *   width: '100%', height: '100%', symbolHeight: 50, symbolWidth: 50,
+     *   symbolPreview: { height: 100, width: 100 },
+     *   enableSearch: true,
+     *   getNodeDefaults: setPaletteNodeDefaults,
+     *   symbolMargin: { left: 12, right: 12, top: 12, bottom: 12 },
+     *   getSymbolInfo: (symbol: NodeModel): SymbolInfo => {
+     *       return { fit: true };
+     *   }
+     * });
+     * palette.appendTo('#symbolpalette');
+     * export function getFlowShapes(): NodeModel[] {
+     *   let flowShapes: NodeModel[] = [
+     *       { id: 'Terminator', shape: { type: 'Flow', shape: 'Terminator' }, style: { strokeWidth: 2 } },
+     *       { id: 'Process', shape: { type: 'Flow', shape: 'Process' }, style: { strokeWidth: 2 } },
+     *       { id: 'Decision', shape: { type: 'Flow', shape: 'Decision' }, style: { strokeWidth: 2 } }
+     *   ];
+     *   return flowShapes;
+     * }
+     * function setPaletteNodeDefaults(node: NodeModel): void {
+     * if (node.id === 'Terminator' || node.id === 'Process') {
+     *   node.width = 130;
+     *   node.height = 65;
+     * } else {
+     *   node.width = 50;
+     *   node.height = 50;
+     * }
+     * node.style.strokeColor = '#3A3A3A';
+     * }
+     * ```
      */
     @Property()
     public getSymbolInfo: Function | string;
@@ -199,7 +243,7 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
     public symbolMargin: MarginModel;
 
     /**
-     * Enables/Disables dragging the symbols from palette
+     * Defines whether the symbols can be dragged from palette or not
      * @default true
      */
     @Property(true)
@@ -262,6 +306,7 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
     /** @private */
     public selectedSymbols: NodeModel | ConnectorModel;
     public symbolTable: {} = {};
+    public childTable: {} = {};
     private diagramRenderer: DiagramRenderer;
     private svgRenderer: DiagramRenderer;
     private accordionElement: Accordion;
@@ -316,8 +361,16 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                 case 'palettes':
                     for (let i of Object.keys(newProp.palettes)) {
                         let index: number = Number(i);
+
+                        if (!this.accordionElement.items[index]) {
+                            this.accordionElement.items[index] = {
+                                header: newProp.palettes[index].title || '',
+                                expanded: newProp.palettes[index].expanded,
+                                iconCss: newProp.palettes[index].iconCss || ''
+                            };
+                        }
                         if (newProp.palettes[index].iconCss !== undefined) {
-                            this.accordionElement.items[index].iconCss = newProp.palettes[index].iconCss;
+                            this.accordionElement.items[index].iconCss = newProp.palettes[index].iconCss || '';
                             refresh = true;
                         }
                         if (newProp.palettes[index].expanded !== undefined) {
@@ -369,7 +422,7 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
             this.createTextbox();
         }
         //create accordion element
-        let accordionDiv: HTMLElement = createElement('div', { id: this.element.id + '_container' });
+        let accordionDiv: HTMLElement = createHtmlElement('div', { id: this.element.id + '_container' });
         this.accordionElement = new Accordion({
             expandMode: this.expandMode
         });
@@ -443,6 +496,10 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                     }
                 }
             }
+            content = document.getElementById(this.element.id + '_search');
+            if (content) {
+                content.parentNode.removeChild(content);
+            }
             this.element.classList.remove('e-symbolpalette');
         }
     }
@@ -455,6 +512,7 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
      * Method to initialize the items in the symbols
      */
     private initSymbols(symbolGroup: PaletteModel): void {
+        let group: NodeModel[] = [];
         for (let symbol of symbolGroup.symbols) {
             if (symbol instanceof Node) {
                 let getNodeDefaults: Function = getFunction(this.getNodeDefaults);
@@ -467,8 +525,28 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                     getConnectorDefaults(symbol, this);
                 }
             }
-            this.prepareSymbol(symbol);
             this.symbolTable[symbol.id] = symbol;
+            if (symbol instanceof Node && symbol.children) {
+                group.push(symbol);
+            }
+        }
+        for (let i: number = 0; i < group.length; i++) {
+            let node: Node | Connector;
+            for (let j: number = 0; j < group[i].children.length; j++) {
+                node = (this.symbolTable[group[i].children[j]]);
+                if (node) {
+                    this.childTable[node.id] = node;
+                    node.parentId = group[i].id;
+                }
+            }
+        }
+        for (let symbol of symbolGroup.symbols) {
+            if (!(symbol instanceof Node && symbol.children)) {
+                this.prepareSymbol(symbol);
+            }
+        }
+        for (let symbol of group) {
+            this.prepareSymbol(symbol);
         }
     }
 
@@ -476,13 +554,11 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
      * Method to create the palette
      */
     private renderPalette(symbolGroup: PaletteModel): void {
-        let paletteDiv: HTMLElement = document.createElement('div');
-        paletteDiv.setAttribute('id', symbolGroup.id);
         let style: string = 'display:none;overflow:auto;';
         if (symbolGroup.height) {
             style += 'height:' + symbolGroup.height + 'px';
         }
-        paletteDiv.setAttribute('style', style);
+        let paletteDiv: HTMLElement = createHtmlElement('div', { 'id': symbolGroup.id, style: style });
         this.element.appendChild(paletteDiv);
 
         let item: AccordionItemModel = {
@@ -508,7 +584,9 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                     obj[Object.keys(paletteSymbol)[i]] = paletteSymbol[Object.keys(paletteSymbol)[i]];
                 }
                 symbolPaletteGroup.symbols.push(obj);
-                this.prepareSymbol(obj);
+                if (!(obj as Node).children) {
+                    this.prepareSymbol(obj);
+                }
                 this.symbolTable[obj.id] = obj;
                 let paletteDiv: HTMLElement = document.getElementById(symbolPaletteGroup.id);
                 paletteDiv.appendChild(this.getSymbolContainer(obj, paletteDiv));
@@ -529,6 +607,12 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                     if (symbol.id.indexOf(symbolId) !== -1) {
                         let index: number = symbolPaletteGroup.symbols.indexOf(symbol);
                         symbolPaletteGroup.symbols.splice(index, 1);
+                        if ((symbol as Node).children) {
+                            let parentNode: string[] = (symbol as Node).children;
+                            for (let i: number = 0; i < parentNode.length; i++) {
+                                delete this.symbolTable[(parentNode[i])];
+                            }
+                        }
                         delete this.symbolTable[symbol.id];
                         let element: HTMLElement = document.getElementById(symbol.id + '_container');
                         element.parentNode.removeChild(element);
@@ -551,97 +635,130 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
         let height: number; let sh: number;
         let stackPanel: StackPanel = new StackPanel();
         let obj: NodeModel = symbol as NodeModel;
-        let content: DiagramElement;
-        let symbolContainer: Canvas = new Canvas();
-
+        let content: DiagramElement; let symbolContainer: Canvas = new Canvas();
+        let container: Container = (symbol instanceof Node) ? (symbol as Node).initContainer() : null;
+        if (container && !container.children) {
+            container.children = [];
+        }
         //preparing objects
         let getSymbolTemplate: Function = getFunction(this.getSymbolTemplate);
         if (getSymbolTemplate) {
             content = getSymbolTemplate(symbol);
         }
         if (!content) {
-            content = (symbol as Node).init(this);
-        }
-
-        let symbolInfo: SymbolInfo = { width: this.symbolWidth, height: this.symbolHeight };
-        let getSymbolInfo: Function = getFunction(this.getSymbolInfo);
-        if (getSymbolInfo) {
-            symbolInfo = getSymbolInfo(symbol);
-        }
-        symbolInfo = symbolInfo || {};
-
-
-        //defining custom templates
-        content.relativeMode = 'Object';
-        content.horizontalAlignment = content.verticalAlignment = 'Center';
-        symbolContainer.style.strokeColor = symbolContainer.style.fill = 'none';
-        symbolContainer.children = [content];
-        content.measure(new Size());
-        content.arrange(content.desiredSize);
-        width = symbolInfo.width = symbolInfo.width ||
-            (obj.width !== undefined ? content.actualSize.width : undefined) || this.symbolWidth;
-        height = symbolInfo.height = symbolInfo.height ||
-            (obj.height !== undefined ? content.actualSize.height : undefined) || this.symbolHeight;
-        if (width !== undefined && height !== undefined) {
-            let actualWidth: number = width;
-            let actualHeight: number = height;
-            if (this.symbolWidth !== undefined) {
-                actualWidth = this.symbolWidth - this.symbolMargin.left - this.symbolMargin.right;
+            if (obj.children) {
+                content = this.getContainer(obj as Node, container);
             } else {
-                width += obj.style.strokeWidth;
+                content = (symbol as Node).init(this);
+                if (symbol instanceof Node && symbol.parentId) {
+                    container.children.push(content);
+                }
             }
-            if (this.symbolHeight !== undefined) {
-                actualHeight = this.symbolHeight - this.symbolMargin.top - this.symbolMargin.bottom;
-            } else {
-                height += obj.style.strokeWidth;
-            }
-            if (symbolInfo.description && symbolInfo.description.text !== '') {
-                actualHeight -= 20; // default height of the text have been reduced from the container.
-            }
-            sw = actualWidth / (content.width || width);
-            sh = actualHeight / (content.height || height);
-            if (symbolInfo.fit) {
-                sw = actualWidth / symbolInfo.width;
-                sh = actualHeight / symbolInfo.height;
-            }
-            width = actualWidth;
-            height = actualHeight;
-            sw = sh = Math.min(sw, sh);
-            symbolContainer.width = width;
-            symbolContainer.height = height;
-            content.width = symbolInfo.width;
-            content.height = symbolInfo.height;
-            this.scaleSymbol(symbol, symbolContainer, sw, sh, width, height);
-        } else {
-            let outerBounds: Rect;
-            if (symbol instanceof Connector) {
-                outerBounds = getOuterBounds(symbol);
-            }
-            content.width = (symbol as Node).width || (outerBounds) ? outerBounds.width : content.actualSize.width;
-            content.height = (symbol as Node).height || (outerBounds) ? outerBounds.height : content.actualSize.height;
         }
-        symbol.wrapper = stackPanel;
-        stackPanel.children = [symbolContainer];
-        content.pivot = stackPanel.pivot = { x: 0, y: 0 };
-        stackPanel.id = content.id + '_symbol';
-        stackPanel.style.fill = stackPanel.style.strokeColor = 'transparent';
-        stackPanel.offsetX = symbol.style.strokeWidth / 2;
-        stackPanel.offsetY = symbol.style.strokeWidth / 2;
-        //symbol description-textElement
-        this.getSymbolDescription(symbolInfo, width, stackPanel);
-        stackPanel.measure(new Size());
-        stackPanel.arrange(stackPanel.desiredSize);
-        symbolInfo.width = symbolInfo.width || content.actualSize.width;
-        symbolInfo.height = symbolInfo.height || content.actualSize.height;
-        symbol[this.info] = symbolInfo;
+        if (!(symbol as Node | Connector).parentId) {
+            let symbolInfo: SymbolInfo = { width: this.symbolWidth, height: this.symbolHeight };
+            let getSymbolInfo: Function = getFunction(this.getSymbolInfo);
+            if (getSymbolInfo) {
+                symbolInfo = getSymbolInfo(symbol);
+            }
+            symbolInfo = symbolInfo || {};
+            //defining custom templates
+            content.relativeMode = 'Object';
+            content.horizontalAlignment = content.verticalAlignment = 'Center';
+            symbolContainer.style.strokeColor = symbolContainer.style.fill = 'none';
+            symbolContainer.children = [content];
+            content.measure(new Size());
+            content.arrange(content.desiredSize);
+            width = symbolInfo.width = symbolInfo.width ||
+                (obj.width !== undefined ? content.actualSize.width : undefined) || this.symbolWidth;
+            height = symbolInfo.height = symbolInfo.height ||
+                (obj.height !== undefined ? content.actualSize.height : undefined) || this.symbolHeight;
+            if (width !== undefined && height !== undefined) {
+                let actualWidth: number = width;
+                let actualHeight: number = height;
+                if (this.symbolWidth !== undefined) {
+                    actualWidth = this.symbolWidth - this.symbolMargin.left - this.symbolMargin.right;
+                } else {
+                    width += obj.style.strokeWidth;
+                }
+                if (this.symbolHeight !== undefined) {
+                    actualHeight = this.symbolHeight - this.symbolMargin.top - this.symbolMargin.bottom;
+                } else {
+                    height += obj.style.strokeWidth;
+                }
+                if (symbolInfo.description && symbolInfo.description.text !== '') {
+                    actualHeight -= 20; // default height of the text have been reduced from the container.
+                }
+                sw = actualWidth / (content.width || width);
+                sh = actualHeight / (content.height || height);
+                if (symbolInfo.fit) {
+                    sw = actualWidth / symbolInfo.width;
+                    sh = actualHeight / symbolInfo.height;
+                }
+                width = actualWidth;
+                height = actualHeight;
+                sw = sh = Math.min(sw, sh);
+                symbolContainer.width = width;
+                symbolContainer.height = height;
+                content.width = symbolInfo.width;
+                content.height = symbolInfo.height;
+                this.scaleSymbol(symbol, symbolContainer, sw, sh, width, height);
+            } else {
+                let outerBounds: Rect;
+                if (symbol instanceof Connector) {
+                    outerBounds = getOuterBounds(symbol);
+                }
+                content.width = (symbol as Node).width || (outerBounds) ? outerBounds.width : content.actualSize.width;
+                content.height = (symbol as Node).height || (outerBounds) ? outerBounds.height : content.actualSize.height;
+            }
+            symbol.wrapper = stackPanel;
+            stackPanel.children = [symbolContainer];
+            content.pivot = stackPanel.pivot = { x: 0, y: 0 };
+            stackPanel.id = content.id + '_symbol';
+            stackPanel.style.fill = stackPanel.style.strokeColor = 'transparent';
+            stackPanel.offsetX = symbol.style.strokeWidth / 2;
+            stackPanel.offsetY = symbol.style.strokeWidth / 2;
+            //symbol description-textElement
+            this.getSymbolDescription(symbolInfo, width, stackPanel);
+            stackPanel.measure(new Size());
+            stackPanel.arrange(stackPanel.desiredSize);
+            symbolInfo.width = symbolInfo.width || content.actualSize.width;
+            symbolInfo.height = symbolInfo.height || content.actualSize.height;
+            symbol[this.info] = symbolInfo;
+        }
+        if ((symbol as Node | Connector).parentId) {
+            container.measure(new Size(obj.width, obj.height));
+            container.arrange(container.desiredSize);
+        }
     }
+
+    private getContainer(obj: Node, container: Container): Container {
+        container.measureChildren = false;
+        let bounds: Rect;
+        let child: string[] = obj.children;
+        container.children = [];
+        for (let i: number = 0; i < child.length; i++) {
+            if (this.symbolTable[child[i]]) {
+                container.children.push(this.symbolTable[child[i]].wrapper);
+            }
+        }
+        container.measure(new Size(obj.width, obj.height));
+        container.arrange(container.desiredSize);
+        if (container.bounds.x !== 0 || container.bounds.y !== 0) {
+            bounds = container.bounds;
+            arrangeChild(obj, bounds.x, bounds.y, this.symbolTable, false, this);
+            container = this.getContainer(obj, container);
+        }
+        return container;
+    }
+
 
     /**
      * Method to get the symbol text description
      * @return {void}
      * @private
      */
-    private getSymbolDescription(symbolInfo: SymbolInfo, width: number, parent: StackPanel): void {
+    private getSymbolDescription(symbolInfo: SymbolInfo, width: number, parent: StackPanel | Container): void {
         if (symbolInfo && symbolInfo.description && symbolInfo.description.text) {
             let textElement: TextElement = new TextElement();
             //symbol description-textElement
@@ -667,7 +784,9 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
      */
     private renderSymbols(symbolGroup: PaletteModel, parentDiv: HTMLElement): void {
         for (let symbol of symbolGroup.symbols) {
-            this.getSymbolContainer(symbol, parentDiv);
+            if (!(symbol as Node | Connector).parentId) {
+                this.getSymbolContainer(symbol, parentDiv);
+            }
         }
     }
 
@@ -694,20 +813,19 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
             let symbolHeight: number = content.actualSize.height * sh;
             symbol.wrapper.children[0].width = symbolPreviewWidth;
             symbol.wrapper.children[0].height = symbolPreviewHeight;
-            this.measureAndArrangeSymbol(content);
-            this.scaleSymbol(symbol, symbol.wrapper.children[0] as Container, sw, sh, symbolWidth, symbolHeight);
+            this.measureAndArrangeSymbol(content, symbol instanceof Node);
+            this.scaleSymbol(
+                symbol, symbol.wrapper.children[0] as Container, sw, sh, symbolWidth, symbolHeight, true);
             symbolPreviewWidth = symbolWidth;
             symbolPreviewHeight = symbolHeight;
         }
         let prevPosition: PointModel = { x: content.offsetX, y: content.offsetY };
         content.offsetX = content.offsetY = symbol.style.strokeWidth / 2;
         content.pivot = { x: 0, y: 0 };
-        this.measureAndArrangeSymbol(content);
-        let previewContainer: HTMLElement = createElement('div');
+        this.measureAndArrangeSymbol(content, symbol instanceof Node);
+        let previewContainer: HTMLElement = createHtmlElement(
+            'div', { 'draggable': 'true', 'class': 'e-dragclone', 'style': 'pointer-events:none' });
         let div: HTMLElement;
-        previewContainer.setAttribute('draggable', 'true');
-        previewContainer.setAttribute('class', 'e-dragclone');
-        previewContainer.style.pointerEvents = 'none';
         document.body.appendChild(previewContainer);
         let style: string = 'margin:5px;';
         if (symbol.shape.type === 'Native') {
@@ -724,24 +842,34 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
         } else if (symbol.shape.type === 'HTML') {
             div = this.getHtmlSymbol(symbol, canvas, previewContainer, symbolPreviewHeight, symbolPreviewWidth, true);
         } else {
-            canvas = CanvasRenderer.createCanvas(
-                symbol.id + '_preview',
-                (Math.ceil(symbolPreviewWidth) + symbol.style.strokeWidth + 1) * 2,
-                (Math.ceil(symbolPreviewHeight) + symbol.style.strokeWidth + 1) * 2);
-            previewContainer.appendChild(canvas);
-            style += 'transform:scale(0.5);';
-            canvas.setAttribute('transform-origin', '0 0');
-            canvas.getContext('2d').setTransform(2, 0, 0, 2, 0, 0);
-            this.diagramRenderer.renderElement(content, canvas, undefined);
+            if ((symbol as NodeModel).children &&
+                (symbol as NodeModel).children.length > 0 && groupHasType(symbol as Node, 'HTML', this.childTable)) {
+                div = this.getGroupParent(
+                    symbol, canvas, previewContainer, symbol.wrapper.actualSize.height,
+                    symbol.wrapper.actualSize.width, true);
+            } else {
+                canvas = CanvasRenderer.createCanvas(
+                    symbol.id + '_preview',
+                    (Math.ceil(symbolPreviewWidth) + symbol.style.strokeWidth + 1) * 2,
+                    (Math.ceil(symbolPreviewHeight) + symbol.style.strokeWidth + 1) * 2);
+                previewContainer.appendChild(canvas);
+                style += 'transform:scale(0.5);';
+                canvas.setAttribute('transform-origin', '0 0');
+                let index: number = 2;
+                if (symbol instanceof Connector) { index = 1.9; }
+                canvas.getContext('2d').setTransform(index, 0, 0, index, 0, 0);
+                this.diagramRenderer.renderElement(content, canvas, undefined);
+            }
         }
-        ((div && symbol.shape.type === 'HTML') ? div : canvas).setAttribute('style', style);
+        ((div && (symbol.shape.type === 'HTML' || (symbol as NodeModel).children
+            && (symbol as NodeModel).children.length > 0)) ? div : canvas).setAttribute('style', style);
         content.offsetX = prevPosition.x;
         content.offsetY = prevPosition.y;
         return previewContainer;
     }
 
-    private measureAndArrangeSymbol(content: DiagramElement): void {
-        if ((content as Container).children) {
+    private measureAndArrangeSymbol(content: DiagramElement, isNode: boolean): void {
+        if ((content as Container).children && !isNode) {
             (content as Container).children[0].transform = Transform.Self;
         }
         content.measure(new Size());
@@ -770,12 +898,12 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
         let size: Size = this.getSymbolSize(symbol, symbolInfo);
         let width: number = size.width + 1;
         let height: number = size.height + 1;
-        let container: HTMLElement = createElement(
+        let container: HTMLElement = createHtmlElement(
             'div', {
                 id: symbol.id + '_container',
-                styles: 'width:' + width + 'px;height:' + height + 'px;float:left;overflow:hidden'
+                style: 'width:' + width + 'px;height:' + height + 'px;float:left;overflow:hidden',
+                title: symbolInfo.description ? symbolInfo.description.text : symbol.id
             });
-        container.setAttribute('title', symbolInfo.description ? symbolInfo.description.text : symbol.id);
         parentDiv.appendChild(container);
         let canvas: HTMLCanvasElement | SVGElement;
         let gElement: SVGElement;
@@ -793,14 +921,24 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
             this.updateSymbolSize(symbol);
             this.svgRenderer.renderElement(symbol.wrapper, gElement, undefined, undefined, canvas as SVGSVGElement);
         } else if (symbol.shape.type === 'HTML') {
-            div = this.getHtmlSymbol(symbol, canvas, container, symbol.wrapper.actualSize.height, symbol.wrapper.actualSize.width, false);
+            div = this.getHtmlSymbol(
+                symbol, canvas, container, symbol.wrapper.actualSize.height, symbol.wrapper.actualSize.width, false);
         } else {
-            canvas = CanvasRenderer.createCanvas(
-                symbol.id, Math.ceil((symbol.wrapper.actualSize.width + symbol.style.strokeWidth) * 2) + 1,
-                Math.ceil((symbol.wrapper.actualSize.height + symbol.style.strokeWidth) * 2) + 1);
-            container.appendChild(canvas);
-            canvas.getContext('2d').setTransform(2, 0, 0, 2, 0, 0);
-            this.diagramRenderer.renderElement(symbol.wrapper, gElement || canvas, undefined);
+            if ((symbol as NodeModel).children &&
+                (symbol as NodeModel).children.length > 0 && groupHasType(symbol as Node, 'HTML', this.childTable)) {
+                div = this.getGroupParent(
+                    symbol, canvas,
+                    container, symbol.wrapper.actualSize.height, symbol.wrapper.actualSize.width, false);
+            } else {
+                canvas = CanvasRenderer.createCanvas(
+                    symbol.id, Math.ceil((symbol.wrapper.actualSize.width + symbol.style.strokeWidth) * 2) + 1,
+                    Math.ceil((symbol.wrapper.actualSize.height + symbol.style.strokeWidth) * 2) + 1);
+                container.appendChild(canvas);
+                let index: number = 2;
+                if (symbol instanceof Connector) { index = 1.9; }
+                canvas.getContext('2d').setTransform(index, 0, 0, index, 0, 0);
+                this.diagramRenderer.renderElement(symbol.wrapper, gElement || canvas, undefined);
+            }
         }
         if (!preview) {
             let actualWidth: number = symbol.wrapper.actualSize.width + symbol.style.strokeWidth;
@@ -812,11 +950,40 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
             if (canvas instanceof HTMLCanvasElement) {
                 style += 'transform:scale(.5,.5);';
             }
-            ((div && symbol.shape.type === 'HTML') ? div : canvas).setAttribute('style', style);
+            ((div && (symbol.shape.type === 'HTML' || (symbol as NodeModel).children &&
+                (symbol as NodeModel).children.length > 0)) ? div : canvas).setAttribute('style', style);
             container.classList.add('e-symbol-draggable');
             return container;
         }
         return canvas as HTMLElement;
+    }
+
+    private getGroupParent(
+        item: NodeModel | ConnectorModel, canvas: HTMLCanvasElement | SVGElement,
+        container: HTMLElement, height: number, width: number, isPreview: boolean): HTMLElement {
+        let div: HTMLElement = createHtmlElement(
+            'div', { 'id': item.id + (isPreview ? '_html_div_preview' : '_html_div') });
+        let htmlLayer: HTMLElement = createHtmlElement(
+            'div', {
+                'id': item.id + (isPreview ? '_htmlLayer_preview' : '_htmlLayer'),
+                'style': 'width:' + Math.ceil(width + 1) + 'px;' +
+                'height:' + Math.ceil(height + 1) + 'px;position:absolute',
+                'class': 'e-html-layer'
+            });
+        let htmlLayerDiv: HTMLElement = createHtmlElement(
+            'div', {
+                'id': item.id + (isPreview ? '_htmlLayer_div_preview' : '_htmlLayer_div'),
+                'style': 'width:' + Math.ceil(width + 1) + 'px;' +
+                'height:' + Math.ceil(height + 1) + 'px;position:absolute',
+            });
+        htmlLayer.appendChild(htmlLayerDiv);
+        div.appendChild(htmlLayer);
+        canvas = CanvasRenderer.createCanvas(
+            (isPreview ? (item.id + '_preview') : item.id), Math.ceil(width) + 1, Math.ceil(height) + 1);
+        div.appendChild(canvas);
+        container.appendChild(div);
+        this.diagramRenderer.renderElement((item.wrapper.children[0] as Container).children[0], canvas, htmlLayer);
+        return div;
     }
 
     private getHtmlSymbol(
@@ -832,19 +999,22 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
             'div', {
                 'id': symbol.id + (isPreview ? '_htmlLayer_preview' : '_htmlLayer'),
                 'style': 'width:' + Math.ceil(width + 1) + 'px;' +
-                    'height:' + Math.ceil(height + 1) + 'px;position:absolute',
+                'height:' + Math.ceil(height + 1) + 'px;position:absolute',
                 'class': 'e-html-layer'
             });
         let htmlLayerDiv: HTMLElement = createHtmlElement(
             'div', {
                 'id': symbol.id + (isPreview ? '_htmlLayer_div_preview' : '_htmlLayer_div'),
                 'style': 'width:' + Math.ceil(width + 1) + 'px;' +
-                    'height:' + Math.ceil(height + 1) + 'px;position:absolute',
+                'height:' + Math.ceil(height + 1) + 'px;position:absolute',
             });
         htmlLayer.appendChild(htmlLayerDiv);
         div.appendChild(htmlLayer);
         canvas = CanvasRenderer.createCanvas(
-            (isPreview ? (symbol.id + '_preview') : symbol.id), Math.ceil(width) + 1, Math.ceil(height) + 1);
+            symbol.id, Math.ceil((symbol.wrapper.actualSize.width + symbol.style.strokeWidth) * 2) + 1,
+            Math.ceil((symbol.wrapper.actualSize.height + symbol.style.strokeWidth) * 2) + 1);
+        container.appendChild(canvas);
+        canvas.getContext('2d').setTransform(2, 0, 0, 2, 0, 0);
         div.appendChild(canvas);
         container.appendChild(div);
         this.diagramRenderer.renderElement((symbol.wrapper.children[0] as Container).children[0], canvas, htmlLayer);
@@ -912,7 +1082,13 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                     this.searchPalette('');
                 }
             } else {
-                evt.preventDefault();
+                let id: string = (<HTMLElement>evt.target).id.split('_container')[0];
+                if (id && this.selectedSymbol) {
+                    let args: IPaletteSelectionChangeArgs = { oldValue: this.selectedSymbol.id, newValue: id };
+                    let event: string = 'paletteSelectionChange';
+                    this.trigger(event, args);
+                    evt.preventDefault();
+                }
             }
         }
     }
@@ -945,15 +1121,14 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
     private mouseDown(evt: PointerEvent): void {
         let id: string = (<HTMLElement>evt.target).id.split('_container')[0];
         if (this.selectedSymbol) {
-            if (id !== this.selectedSymbol.id) {
-                let oldSymbol: HTMLElement = document.getElementById(this.selectedSymbol.id + '_container');
+            let oldSymbol: HTMLElement = document.getElementById(this.selectedSymbol.id + '_container');
+            if (id !== this.selectedSymbol.id && oldSymbol) {
                 oldSymbol.classList.remove('e-symbol-selected');
-                let args: IPaletteSelectionChangeArgs = { oldValue: this.selectedSymbol.id, newValue: id };
-                let event: string = 'paletteSelectionChange';
-                this.trigger(event, args);
             }
             let container: HTMLElement = document.getElementById(this.selectedSymbol.id + '_container');
-            container.style.backgroundColor = '';
+            if (container) {
+                container.style.backgroundColor = '';
+            }
             this.selectedSymbol = null;
         }
         if (this.symbolTable[id]) {
@@ -1022,13 +1197,11 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
 
     //end region - draggable 
 
-
-
     //region - helper methods
 
     private scaleSymbol(
         symbol: NodeModel | ConnectorModel, symbolContainer: Container, sw: number, sh: number,
-        width: number, height: number): void {
+        width: number, height: number, preview?: boolean): void {
         if (symbol instanceof Connector) {
             let wrapper: Container = symbol.wrapper;
             symbol.wrapper = symbolContainer.children[0] as Container;
@@ -1051,8 +1224,105 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                 symbol as Node, symbol as Node, null);
             symbol.wrapper = wrapper;
         } else {
-            scaleElement(symbolContainer.children[0], sw, sh, symbolContainer);
+            if ((symbol as Node).children) {
+                let parentNode: string[] = (symbol as Node).children;
+                let w: number = 0; let h: number = 0;
+                if (!preview) {
+                    let node: Node;
+                    let container: DiagramElement;
+                    for (let i: number = 0; i < parentNode.length; i++) {
+                        container = (symbolContainer.children[0] as Container).children[i];
+                        if (container) {
+                            if (((container as Container).children[0] as Container).children) {
+                                this.measureChild(container);
+                            }
+                            node = this.symbolTable[container.id];
+                            container.width = node.width;
+                            container.height = node.height;
+                            container.measure(new Size());
+                            container.arrange((container as Container).children[0].desiredSize);
+                        }
+                    }
+                }
+                w = width / symbolContainer.children[0].desiredSize.width;
+                h = height / symbolContainer.children[0].desiredSize.height;
+                symbolContainer.children[0].measure(new Size());
+                symbolContainer.children[0].arrange(symbolContainer.children[0].desiredSize);
+                if (!preview) {
+                    let children: DiagramElement;
+                    for (let i: number = 0; i < parentNode.length; i++) {
+                        children = (symbolContainer.children[0] as Container).children[i];
+                        if (children) {
+                            if (((children as Container).children[0] as Container).children) {
+                                this.scaleChildren(children, w, h, symbol);
+                            }
+                            this.scaleGroup(children, w, h, symbol);
+                        }
+
+                    }
+                }
+                if (preview) {
+                    let node: Node;
+                    let scaleWidth: number;
+                    let scaleHeight: number;
+                    let children: DiagramElement;
+                    for (let i: number = 0; i < parentNode.length; i++) {
+                        node = this.symbolTable[parentNode[i]];
+                        scaleWidth = width / symbol.wrapper.children[0].desiredSize.width;
+                        scaleHeight = height / symbol.wrapper.children[0].desiredSize.height;
+                        children = (symbolContainer.children[0] as Container).children[i];
+                        if (children) {
+                            if (((children as Container).children[0] as Container).children) {
+                                this.scaleChildren(children, scaleWidth, scaleHeight, symbol, true);
+                            }
+                            this.scaleGroup(children, scaleWidth, scaleHeight, symbol, true);
+                        }
+                    }
+                    symbol.wrapper.children[0].measure(new Size());
+                    symbol.wrapper.children[0].arrange(symbol.wrapper.children[0].desiredSize);
+                }
+            } else {
+                scaleElement(symbolContainer.children[0], sw, sh, symbolContainer);
+            }
         }
+    }
+
+    private scaleChildren(container: DiagramElement, w: number, h: number, symbol: NodeModel | ConnectorModel, preview?: boolean): void {
+        let child: DiagramElement;
+        for (let i: number = 0; i < (container as Container).children.length; i++) {
+            child = (container as Container).children[i];
+            if (!((child as Container).children[0] as Container).children) {
+                this.scaleGroup(child, w, h, symbol, preview);
+            } else {
+                this.scaleChildren(child, w, h, symbol, preview);
+            }
+        }
+    }
+
+    private measureChild(container: DiagramElement): void {
+        let childContainer: DiagramElement;
+        let node: NodeModel;
+        for (let i: number = 0; i < (container as Container).children.length; i++) {
+            childContainer = (container as Container).children[i];
+            if (!((childContainer as Container).children[0] as Container).children) {
+                node = this.symbolTable[childContainer.id];
+                childContainer.width = node.width;
+                childContainer.height = node.height;
+                childContainer.measure(new Size());
+                childContainer.arrange((childContainer as Container).children[0].desiredSize);
+            } else {
+                this.measureChild(childContainer);
+            }
+        }
+    }
+
+    private scaleGroup(child: DiagramElement, w: number, h: number, symbol: NodeModel | ConnectorModel, preview?: boolean): void {
+        child.width = child.width * w;
+        child.height = (child.height * h);
+        child.offsetX = preview ? (child.offsetX * w) - symbol.style.strokeWidth : (child.offsetX * w) + symbol.style.strokeWidth / 2;
+        child.offsetY = preview ? (child.offsetY * h) - symbol.style.strokeWidth : (child.offsetY * h) + symbol.style.strokeWidth / 2;
+        child.measure(new Size());
+        child.arrange((child as Container).children[0].desiredSize);
     }
 
     private refreshPalettes(): void {
@@ -1070,17 +1340,17 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
     }
 
     private createTextbox(): void {
-        let searchDiv: HTMLElement = createElement('div', { id: this.element.id + '_search' });
+        let searchDiv: HTMLElement = createHtmlElement('div', { id: this.element.id + '_search' });
         searchDiv.setAttribute('style', 'backgroundColor:white;height:30px');
         searchDiv.className = 'e-input-group';
         this.element.appendChild(searchDiv);
-        let textBox: HTMLInputElement = document.createElement('input');
+        let textBox: HTMLInputElement = createHtmlElement('input', {}) as HTMLInputElement;
         textBox.placeholder = 'Search Shapes';
         textBox.id = 'textEnter';
         textBox.setAttribute('style', 'width:100%;height:auto');
         textBox.className = 'e-input';
         searchDiv.appendChild(textBox);
-        let span: HTMLElement = createElement('span', { id: 'iconSearch', className: 'e-input-group-icon e-search e-icons' });
+        let span: HTMLElement = createHtmlElement('span', { id: 'iconSearch', className: 'e-input-group-icon e-search e-icons' });
         searchDiv.appendChild(span);
     }
 
@@ -1120,10 +1390,8 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
                 this.getSymbolContainer(symbol, element);
             }
         } else if (value !== '') {
-            let emptyDiv: HTMLElement = document.createElement('div');
-            emptyDiv.setAttribute('id', 'EmptyDiv');
+            let emptyDiv: HTMLElement = createHtmlElement('div', { 'id': 'EmptyDiv', 'style': 'text-align:center;font-style:italic' });
             emptyDiv.innerHTML = 'No Items To Display';
-            emptyDiv.setAttribute('style', 'textAlign:center;fontStyle:italic');
             element.appendChild(emptyDiv);
         } else {
             let element: HTMLElement = document.getElementById('iconSearch');
@@ -1133,9 +1401,7 @@ export class SymbolPalette extends Component<HTMLElement> implements INotifyProp
     }
 
     private createSearchPalette(paletteDiv: HTMLElement): HTMLElement {
-        paletteDiv = document.createElement('div');
-        paletteDiv.setAttribute('id', 'SearchPalette');
-        paletteDiv.setAttribute('style', 'display:none;overflow:auto;');
+        paletteDiv = createHtmlElement('div', { 'id': 'SearchPalette', 'style': 'display:none;overflow:auto;' });
         this.element.appendChild(paletteDiv);
         let paletteCollection: AccordionItemModel = {
             header: 'Search Results', expanded: true,
@@ -1233,12 +1499,18 @@ export interface SymbolDescription {
 
     /**
      * Defines how to handle the text when its size exceeds the given symbol size
+     * * Wrap - Wraps the text to next line, when it exceeds its bounds
+     * * Ellipsis - It truncates the overflown text and represents the clipping with an ellipsis
+     * * Clip - It clips the overflow text
      * @default ellipsis
      */
     overflow?: TextOverflow;
 
     /**
      * Defines how to wrap the text
+     * * WrapWithOverflow - Wraps the text so that no word is broken
+     * * Wrap - Wraps the text and breaks the word, if necessary
+     * * NoWrap - Text will no be wrapped
      * @default Wrap
      */
     wrap?: TextWrap;

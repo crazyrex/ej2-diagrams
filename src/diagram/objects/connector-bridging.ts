@@ -4,11 +4,12 @@ import { BridgeDirection } from '../enum/enum';
 import { ConnectorModel } from './connector-model';
 import { Rect } from '../primitives/rect';
 import { Diagram } from '../diagram';
-import { findAngle, Segment, Intersection, LengthFraction, BridgeSegment, Bridge } from '../utility/connector';
+import { findAngle, Intersection, LengthFraction, BridgeSegment, Bridge } from '../utility/connector';
 import { intersect3 } from '../utility/diagram-util';
 import { ArcSegment } from '../utility/connector';
 import { Connector } from './connector';
 import { canBridge } from '../utility/constraints-util';
+import { Segment } from '../interaction/scroller';
 
 /**
  * ConnectorBridging defines the bridging behavior
@@ -310,7 +311,7 @@ export class ConnectorBridging {
     }
     /** @private */
     public getLineSegment(x1: number, y1: number, x2: number, y2: number): Segment {
-        return { 'X1': Number(x1) || 0, 'Y1': Number(y1) || 0, 'X2': Number(x2) || 0, 'Y2': Number(y2) || 0 };
+        return { 'x1': Number(x1) || 0, 'y1': Number(y1) || 0, 'x2': Number(x2) || 0, 'y2': Number(y2) || 0 };
     }
 
     private isEmptyPoint(point: PointModel): boolean {

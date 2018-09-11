@@ -180,24 +180,22 @@ describe('Diagram Control', () => {
         });
 
         it('checking hyperlink', (done: Function) => {
-            
+
             let mouseEvents: MouseEvents = new MouseEvents();
             let diagramCanvas: HTMLElement = document.getElementById(diagram.element.id + 'content');
             mouseEvents.mouseMoveEvent(diagramCanvas, 108, 308, true);
             mouseEvents.mouseUpEvent(diagramCanvas, 108, 308, true);
             let element: HTMLElement = document.getElementById('diagram53content');
-         console.log(element.style.cursor);
             expect(element.style.cursor === 'pointer').toBe(true);
             (diagram.nodes[4] as NodeModel).annotations[0].hyperlink.link = 'https://gitlab.syncfusion.com';
             diagram.dataBind();
             mouseEvents.clickEvent(diagramCanvas, 10, 10, true);
             mouseEvents.mouseMoveEvent(diagramCanvas, 108, 308, true);
             mouseEvents.mouseUpEvent(diagramCanvas, 108, 308, true);
-            
+
             let node: NodeModel = diagram.nodes[4];
             let link: HyperlinkModel = (node.wrapper.children[1]) as HyperlinkModel;
-            console.log((link as AnnotationModel).hyperlink.link);
-            expect( (link as AnnotationModel).hyperlink.link === 'https://gitlab.syncfusion.com').toBe(true);
+            expect((link as AnnotationModel).hyperlink.link === 'https://gitlab.syncfusion.com').toBe(true);
             done();
         });
         it('checking annotation hyperlink data bind', (done: Function) => {
@@ -253,10 +251,10 @@ describe('Diagram Control', () => {
         it('Checking annotation alinments and positions in SVG rendering Mode on propertychange', (done: Function) => {
             (diagram.nodes[0] as NodeModel).annotations[0].style.textAlign = 'Left';
             diagram.dataBind();
-            let node = document.getElementById(diagram.nodes[0].id + '_' + diagram.nodes[0].annotations[0].id + '_text');
-            let valueX = node.childNodes[0].attributes[0].value
-            let valueY = node.childNodes[0].attributes[1].value
-            expect(valueX === '0' && valueY === '28.6').toBe(true);
+            let node: HTMLElement = document.getElementById(diagram.nodes[0].id + '_' + diagram.nodes[0].annotations[0].id + '_text');
+            let valueX: string = (node.childNodes[0] as HTMLElement).getAttribute('x');
+            let valueY: string = (node.childNodes[0] as HTMLElement).getAttribute('y');
+            expect(valueX === '0' && (valueY === '28.6' || valueY === '27.400000000000002')).toBe(true);
             done();
         });
     });
@@ -327,6 +325,29 @@ describe('Diagram Control', () => {
             expect(document.getElementById('node1_label1_text').style.fontStyle === 'normal').toBe(true);
             done();
         });
+
+        it('Testing label line height in SVG mode', (done: Function) => {
+            diagram.nodes[0].annotations[0].content
+                = 'ssssssss sssssss sssssss sssssss sssssss sssssss sssssss sssssss sssssss sssssss sssssss ssssssss';
+            diagram.nodes[0].annotations[0].offset = { x: 0.5, y: 0.5 };
+            diagram.dataBind();
+            let textElement: HTMLElement
+                = document.getElementById(diagram.nodes[0].id + '_' + diagram.nodes[0].annotations[0].id + '_text');
+            expect(textElement.childNodes.length === 6).toBe(true);
+            function getAttributeX(i: number): string {
+                return (textElement.childNodes[i] as HTMLElement).getAttribute('x');
+            }
+            function getAttributeY(i: number): string {
+                return (textElement.childNodes[i] as HTMLElement).getAttribute('y');
+            }
+            expect(getAttributeX(0) === '0' && getAttributeY(0) === '3.6000000000000085').toBe(true);
+            expect(getAttributeX(1) === '3' && getAttributeY(1) === '18.000000000000007').toBe(true);
+            expect(getAttributeX(2) === '3' && getAttributeY(2) === '32.400000000000006').toBe(true);
+            expect(getAttributeX(3) === '3' && getAttributeY(3) === '46.800000000000004').toBe(true);
+            expect(getAttributeX(4) === '3' && getAttributeY(4) === '61.2').toBe(true);
+            expect(getAttributeX(5) === '0' && getAttributeY(5) === '75.6').toBe(true);
+            done();
+        });
     });
 
     describe('Annotation Position Issue', () => {
@@ -365,8 +386,8 @@ describe('Diagram Control', () => {
         it('Testing label style in SVG mode', (done: Function) => {
             let transform: string = document.getElementById('node1_label1_text').getAttribute("transform");
             let transform2: string = document.getElementById('node2_label1_text').getAttribute("transform");
-                expect(transform === 'rotate(0,100.5,136.5)translate(73.484375,130.5)' || transform == 'rotate(0,100.5,136.5)translate(73.3203125,130.5)').toBe(true);
-                expect(transform2 === 'rotate(0,100.5,136.5)translate(82.828125,130.5)' || transform2 == 'rotate(0,100.5,136.5)translate(82.6640625,130.5)').toBe(true);            done();
+            expect(transform === 'rotate(0,100.5,136.5)translate(73.484375,130.5)' || transform == 'rotate(0,100.5,136.5)translate(73.3203125,130.5)').toBe(true);
+            expect(transform2 === 'rotate(0,100.5,136.5)translate(82.828125,130.5)' || transform2 == 'rotate(0,100.5,136.5)translate(82.6640625,130.5)').toBe(true); done();
         });
     });
 });

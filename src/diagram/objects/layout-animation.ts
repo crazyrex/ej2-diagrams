@@ -60,9 +60,8 @@ export class LayoutAnimation {
         }
         if (stop) {
             clearInterval(layoutTimer[0]);
-            diagram.protectPropertyChange(this.protectChange);
+            diagram.protectPropertyChange(true);
             diagram.triggerEvent(DiagramEvent.animationComplete, undefined);
-            this.protectChange = false;
             diagram.organizationalChartModule.isAnimation = false;
             diagram.layout.fixedNode = '';
             diagram.protectPropertyChange(this.protectChange);
@@ -78,7 +77,6 @@ export class LayoutAnimation {
             let connector: ConnectorModel = diagram.nameTable[source.outEdges[i]];
             let target: Node = diagram.nameTable[connector.targetID];
             connector.style.opacity = value;
-            diagram.updateDiagramObject(source);
             for (let j: number = 0; j < connector.wrapper.children.length; j++) {
                 connector.wrapper.children[j].style.opacity = value;
                 target.style.opacity = value;

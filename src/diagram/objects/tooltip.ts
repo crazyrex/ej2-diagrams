@@ -5,8 +5,9 @@ import { Diagram } from '../diagram';
 import { NodeModel } from './node-model';
 import { ConnectorModel } from './connector-model';
 import { DiagramTooltipModel } from './tooltip-model';
-/**
- * Defines the behavior of Tooltip
+/** 
+ * Defines the tooltip that should be shown when the mouse hovers over node.
+ * An object that defines the description, appearance and alignments of tooltip
  */
 export abstract class DiagramTooltip extends ChildProperty<DiagramTooltip> {
 
@@ -26,6 +27,8 @@ export abstract class DiagramTooltip extends ChildProperty<DiagramTooltip> {
 
     /**
      * Defines the relative mode of the Tooltip
+     * * Object - sets the tooltip position relative to the node
+     * * Mouse - sets the tooltip position relative to the mouse
      * @default 'Mouse'
      */
     @Property('Mouse')
@@ -54,6 +57,23 @@ export abstract class DiagramTooltip extends ChildProperty<DiagramTooltip> {
 
     /**
      * Allows to set the same or different animation option for the Tooltip, when it is opened or closed.
+     * ```html
+     * <div id='diagram'></div>
+     * ```
+     * ```typescript
+     * let diagram: Diagram = new Diagram({
+     * ...
+     * constraints: DiagramConstraints.Default | DiagramConstraints.Tooltip,
+     * tooltip: { content: getcontent(), position: 'TopLeft', relativeMode: 'Object',
+     * animation: { open: { effect: 'FadeZoomIn', delay: 0 },
+     * close: { effect: 'FadeZoomOut', delay: 0 } } },
+     * ...
+     * });
+     * diagram.appendTo('#diagram');
+     * function getcontent(): => {
+     * ...
+     * }
+     * ```
      * @aspDefaultValueIgnore
      * @default { open: { effect: 'FadeIn', duration: 150, delay: 0 }, close: { effect: 'FadeOut', duration: 150, delay: 0 } }
      */

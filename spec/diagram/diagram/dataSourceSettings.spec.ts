@@ -169,7 +169,7 @@ describe('Diagram Control', () => {
         beforeAll((): void => {
             ele = createElement('div', { id: 'diagram' });
             document.body.appendChild(ele);
-            const SERVICE_URI = 'http://mvc.syncfusion.com/Services/Northwnd.svc';
+            const SERVICE_URI = 'https://mvc.syncfusion.com/Services/Northwnd.svc';
             let items: DataManager = new DataManager({ url: SERVICE_URI }, new Query().from('Employees').
                 select('EmployeeID, ReportsTo, FirstName'));
             let i: number = 1;
