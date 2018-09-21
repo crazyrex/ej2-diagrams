@@ -1345,6 +1345,15 @@ export class Node extends NodeBase implements IElement {
     // tslint:disable-next-line:no-any
     constructor(parent: any, propName: string, defaultValue: Object, isArray?: boolean) {
         super(parent, propName, defaultValue, isArray);
+        if (this.children && this.children.length > 0) {
+            let nodeDefault: NodeModel = defaultValue;
+            if (!nodeDefault.style || !nodeDefault.style.fill) {
+                this.style.fill = 'transparent';
+            }
+            if (!nodeDefault.style || !nodeDefault.style.strokeColor) {
+                this.style.strokeColor = 'transparent';
+            }
+        }
     }
 
     /**

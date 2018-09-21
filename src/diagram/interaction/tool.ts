@@ -165,11 +165,16 @@ export class ToolBase {
                     horizontalsnap, verticalsnap, snapLine, difx, dify, shape, endPoint === startPoint, initialBounds) : difx;
                 dify = 0; deltaWidth = (initialBounds.width - difx) / width; break;
             case 'ResizeEast':
-                diff = transformPointByMatrix(matrix, ({ x: difx, y: dify })); difx = diff.x; dify = diff.y;
+                diff = transformPointByMatrix(matrix, ({ x: difx, y: dify }));
+                difx = diff.x;
+                dify = diff.y;
                 difx = snapEnabled ? this.commandHandler.snappingModule.snapRight(
                     horizontalsnap, verticalsnap, snapLine, difx, dify, shape, endPoint === startPoint, initialBounds) :
                     difx;
-                dify = 0; deltaWidth = (initialBounds.width + difx) / width; deltaHeight = 1; break;
+                dify = 0;
+                deltaWidth = (initialBounds.width + difx) / width;
+                deltaHeight = 1;
+                break;
             case 'ResizeNorth':
                 deltaWidth = 1;
                 diff = transformPointByMatrix(matrix, ({ x: difx, y: dify })); difx = diff.x; dify = diff.y;
@@ -874,7 +879,6 @@ export class ResizeTool extends ToolBase {
             let deltaValues: Rect = this.updateSize(args.source, this.currentPosition, this.prevPosition, this.corner, this.initialBounds);
             this.blocked = this.scaleObjects(
                 deltaValues.width, deltaValues.height, this.corner, this.currentPosition, this.prevPosition, args.source);
-
             let oldValue: SelectorModel = {
                 offsetX: args.source.wrapper.offsetX, offsetY: args.source.wrapper.offsetY,
                 width: args.source.wrapper.actualSize.width, height: args.source.wrapper.actualSize.height

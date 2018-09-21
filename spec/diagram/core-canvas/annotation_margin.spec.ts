@@ -18,6 +18,7 @@ describe('Diagram Control', () => {
         let node: NodeModel;
         let node2: NodeModel;
         let node3: NodeModel;
+        let node4: NodeModel;
         let style: TextStyleModel = { strokeColor: 'black', opacity: 0.5, strokeWidth: 1 };
         let pathData: string = 'M540.3643,137.9336L546.7973,159.7016L570.3633,159.7296L550.7723,171.9366L558.9053,' +
             '194.9966L540.3643,179.4996L521.8223,194.9966L529.9553,171.9366' +
@@ -56,6 +57,10 @@ describe('Diagram Control', () => {
                 style: style, width: 85
             };
             node2.annotations = [annotation];
+            node4 ={
+        id: 'node4', width: 50, height: 50, offsetX: 700, offsetY: 100, style: { fill: 'none' },
+        shape: { type: 'Image', source: '' }
+    },
 
             node3 = {
                 id: 'node3', width: 100, height: 100, offsetX: 500, offsetY: 100,
@@ -84,7 +89,7 @@ describe('Diagram Control', () => {
             diagram = new Diagram({
                 mode: 'Canvas',
                 width: '800px', height: '800px',
-                nodes: [node, node2, node3, node6]
+                nodes: [node, node2, node3, node6,node4]
             });
             diagram.appendTo('#diagram48');
         });

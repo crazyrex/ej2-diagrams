@@ -1057,6 +1057,55 @@ function getPaletteSymbols(symbolPalette: SymbolPalette): NodeModel[] {
     }
     return nodes;
 }
+/** @private */
+export function getPoint(
+    x: number, y: number, w: number, h: number, angle: number, offsetX: number, offsetY: number, cornerPoint: PointModel): PointModel {
+    let pivot: PointModel = { x: 0, y: 0 };
+    let trans: Matrix = identityMatrix();
+    rotateMatrix(trans, angle, offsetX, offsetY);
+    switch (cornerPoint.x) {
+        case 0:
+            switch (cornerPoint.y) {
+                case 0:
+                    pivot = transformPointByMatrix(trans, ({ x: x, y: y }));
+                    break;
+                case 0.5:
+                    pivot = transformPointByMatrix(trans, ({ x: x, y: y + h / 2 }));
+                    break;
+                case 1:
+                    pivot = transformPointByMatrix(trans, ({ x: x, y: y + h }));
+                    break;
+            }
+            break;
+        case 0.5:
+            switch (cornerPoint.y) {
+                case 0:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w / 2, y: y }));
+                    break;
+                case 0.5:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w / 2, y: y + h / 2 }));
+                    break;
+                case 1:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w / 2, y: y + h }));
+                    break;
+            }
+            break;
+        case 1:
+            switch (cornerPoint.y) {
+                case 0:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w, y: y }));
+                    break;
+                case 0.5:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w, y: y + h / 2 }));
+                    break;
+                case 1:
+                    pivot = transformPointByMatrix(trans, ({ x: x + w, y: y + h }));
+                    break;
+            }
+            break;
+    }
+    return { x: pivot.x, y: pivot.y };
+}
 
 /**
  * Get the object as Node | Connector

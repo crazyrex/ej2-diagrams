@@ -14,7 +14,7 @@ import { Rect } from '../primitives/rect';
 import { Diagram } from '../../diagram/diagram';
 import { DiagramElement, Corners } from './../core/elements/diagram-element';
 import { identityMatrix, rotateMatrix, transformPointByMatrix, scaleMatrix, Matrix } from './../primitives/matrix';
-import { cloneObject as clone, cloneObject, getBounds, rotatePoint } from './../utility/base-util';
+import { cloneObject as clone, cloneObject, getBounds } from './../utility/base-util';
 import { completeRegion, getTooltipOffset, sort, findObjectIndex, intersect3, getAnnotationPosition } from './../utility/diagram-util';
 import { randomId, cornersPointsBeforeRotation } from './../utility/base-util';
 import { SelectorModel } from './selector-model';
@@ -33,7 +33,7 @@ import { Canvas } from '../core/containers/canvas';
 import { getDiagramElement, getAdornerLayerSvg, getHTMLLayer, getAdornerLayer } from '../utility/dom-util';
 import { Point } from '../primitives/point';
 import { Size } from '../primitives/size';
-import { getObjectType } from './../utility/diagram-util';
+import { getObjectType, getPoint } from './../utility/diagram-util';
 import { LayerModel } from '../diagram/layer-model';
 import { Layer } from '../diagram/layer';
 import { SelectorConstraints, Direction } from '../enum/enum';
@@ -685,6 +685,12 @@ export class CommandHandler {
                 this.addHistoryEntry(entry);
             }
             if (node.children) {
+                if ((node as Node).ports && (node as Node).ports.length > 0) {
+                    this.diagram.removePorts((node as Node), (node as Node).ports);
+                }
+                if ((node as Node).annotations && (node as Node).annotations.length > 0) {
+                    this.diagram.removeLabels((node as Node), (node as Node).annotations);
+                }
                 let parentNode: NodeModel = this.diagram.nameTable[(node as Node).parentId];
                 for (let j: number = node.children.length - 1; j >= 0; j--) {
                     (this.diagram.nameTable[node.children[0]]).parentId = '';
@@ -2299,8 +2305,7 @@ export class CommandHandler {
                     bound = this.diagram.bpmnModule.getChildrenBound(node, node.id, this.diagram);
                     isResize = node.wrapper.bounds.containsRect(bound);
                 }
-                width = node.wrapper.actualSize.width * sw;
-                height = node.wrapper.actualSize.height * sh;
+                width = node.wrapper.actualSize.width * sw; height = node.wrapper.actualSize.height * sh;
                 if (node.maxWidth !== undefined && node.maxWidth !== 0) {
                     width = Math.min(node.maxWidth, width);
                 }
@@ -2324,11 +2329,12 @@ export class CommandHandler {
             refWrapper = refObject.wrapper;
             let x: number = refWrapper.offsetX - refWrapper.actualSize.width * refWrapper.pivot.x;
             let y: number = refWrapper.offsetY - refWrapper.actualSize.height * refWrapper.pivot.y;
-            let refPoint: PointModel = { x: x + refWrapper.actualSize.width * pivot.x, y: y + refWrapper.actualSize.height * pivot.y };
-            refPoint = rotatePoint(refWrapper.rotateAngle, refWrapper.offsetX, refWrapper.offsetY, refPoint);
-            rotateMatrix(matrix, -refWrapper.rotateAngle, refPoint.x, refPoint.y);
-            scaleMatrix(matrix, sw, sh, refPoint.x, refPoint.y);
-            rotateMatrix(matrix, refWrapper.rotateAngle, refPoint.x, refPoint.y);
+            pivot = getPoint(
+                x, y, refWrapper.actualSize.width, refWrapper.actualSize.height,
+                refWrapper.rotateAngle, refWrapper.offsetX, refWrapper.offsetY, pivot);
+            rotateMatrix(matrix, -refWrapper.rotateAngle, pivot.x, pivot.y);
+            scaleMatrix(matrix, sw, sh, pivot.x, pivot.y);
+            rotateMatrix(matrix, refWrapper.rotateAngle, pivot.x, pivot.y);
             if (obj instanceof Node) {
                 let node: Node = obj; let left: number; let top: number;
                 let newPosition: PointModel = transformPointByMatrix(matrix, { x: node.wrapper.offsetX, y: node.wrapper.offsetY });

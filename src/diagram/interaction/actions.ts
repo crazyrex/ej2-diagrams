@@ -84,7 +84,10 @@ export function findToolToActivate(
             //check for resizing tool
             let x: number = element.offsetX - element.pivot.x * element.actualSize.width;
             let y: number = element.offsetY - element.pivot.y * element.actualSize.height;
-            let rotateThumb: PointModel = { x: x + element.actualSize.width / 2, y: y - 30 / diagram.scroller.currentZoom };
+            let rotateThumb: PointModel = {
+                x: x + ((element.pivot.x === 0.5 ? element.pivot.x * 2 : element.pivot.x) * element.actualSize.width / 2),
+                y: y - 30 / diagram.scroller.currentZoom
+            };
             rotateThumb = transformPointByMatrix(matrix, rotateThumb);
             let labelSelection: boolean = (diagram.selectedItems as Selector).annotation ? true : false;
             let labelRotate: boolean = (labelSelection && (canRotate((diagram.selectedItems as Selector).annotation))) ? true : false;

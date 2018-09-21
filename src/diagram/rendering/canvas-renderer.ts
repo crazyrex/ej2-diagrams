@@ -387,7 +387,16 @@ export class CanvasRenderer implements IRenderer {
         }
     }
 
-    public drawImage(canvas: HTMLCanvasElement, obj: ImageAttributes): void {
+    private loadImage(ctx: CanvasRenderingContext2D, obj: ImageAttributes): void {
+        ctx.rotate(obj.angle * Math.PI / 180);
+        let image: HTMLImageElement = new Image();
+        image.src = obj.source;
+        this.image(ctx, image, obj.x, obj.y, obj.width, obj.height, obj);
+        ctx.rotate(-(obj.angle * Math.PI / 180));
+    }
+
+    public drawImage(canvas: HTMLCanvasElement, obj: ImageAttributes, parentSvg?: SVGSVGElement, fromPalette?: boolean): void {
+
         if (obj.visible) {
             let ctx: CanvasRenderingContext2D = CanvasRenderer.getContext(canvas);
             ctx.save();
@@ -405,13 +414,13 @@ export class CanvasRenderer implements IRenderer {
              *             ctx.drawImage(imageObj, obj.x, obj.y, obj.width, obj.height);
              * }
              */
-            imageObj.onload = () => {
-                ctx.rotate(obj.angle * Math.PI / 180);
-                let image: HTMLImageElement = new Image();
-                image.src = obj.source;
-                this.image(ctx, image, obj.x, obj.y, obj.width, obj.height, obj);
-                ctx.rotate(-(obj.angle * Math.PI / 180));
-            };
+            if (!fromPalette) {
+                this.loadImage(ctx, obj);
+            } else {
+                imageObj.onload = () => {
+                    this.loadImage(ctx, obj);
+                };
+            }
             ctx.restore();
         }
     }

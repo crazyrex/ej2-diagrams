@@ -139,20 +139,20 @@ export class DiagramRenderer {
 
     public renderElement(
         element: DiagramElement, canvas: HTMLCanvasElement | SVGElement, htmlLayer: HTMLElement, transform?: Transforms,
-        parentSvg?: SVGSVGElement, createParent?: boolean):
+        parentSvg?: SVGSVGElement, createParent?: boolean, fromPalette?: boolean):
         void {
         if (element instanceof Container) {
-            this.renderContainer(element, canvas, htmlLayer, transform, parentSvg, createParent);
+            this.renderContainer(element, canvas, htmlLayer, transform, parentSvg, createParent, fromPalette);
         } else if (element instanceof ImageElement) {
-            this.renderImageElement(element, canvas, transform, parentSvg);
+            this.renderImageElement(element, canvas, transform, parentSvg, fromPalette);
         } else if (element instanceof PathElement) {
-            this.renderPathElement(element, canvas, transform, parentSvg);
+            this.renderPathElement(element, canvas, transform, parentSvg, fromPalette);
         } else if (element instanceof TextElement) {
-            this.renderTextElement(element, canvas, transform, parentSvg);
+            this.renderTextElement(element, canvas, transform, parentSvg, fromPalette);
         } else if (element instanceof DiagramNativeElement) {
-            this.renderNativeElement(element, canvas, transform, parentSvg);
+            this.renderNativeElement(element, canvas, transform, parentSvg, fromPalette);
         } else if (element instanceof DiagramHtmlElement) {
-            this.renderHTMLElement(element, canvas, htmlLayer, transform, parentSvg);
+            this.renderHTMLElement(element, canvas, htmlLayer, transform, parentSvg, fromPalette);
         } else {
             this.renderRect(element, canvas, transform, parentSvg);
         }
@@ -605,7 +605,7 @@ export class DiagramRenderer {
 
     public renderPathElement(
         element: PathElement, canvas: HTMLCanvasElement | SVGElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement):
+        transform?: Transforms, parentSvg?: SVGSVGElement, fromPalette?: boolean):
         void {
         let options: BaseAttributes = this.getBaseAttributes(element, transform);
         (options as PathAttributes).data = element.absolutePath;
@@ -822,7 +822,7 @@ export class DiagramRenderer {
 
     public renderTextElement(
         element: TextElement, canvas: HTMLCanvasElement | SVGElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement):
+        transform?: Transforms, parentSvg?: SVGSVGElement, fromPalette?: boolean):
         void {
 
         let options: BaseAttributes = this.getBaseAttributes(element, transform);
@@ -852,7 +852,7 @@ export class DiagramRenderer {
 
     private renderNativeElement(
         element: DiagramNativeElement, canvas: HTMLCanvasElement | SVGElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement): void {
+        transform?: Transforms, parentSvg?: SVGSVGElement, fromPalette?: boolean): void {
         let templateWidth: number; let templateHeight: number;
         let nativeSvg: SVGSVGElement = this.getParentSvg(element, undefined, canvas) || parentSvg;
         let nativeLayer: HTMLCanvasElement | SVGElement = this.getParentElement(element, canvas, nativeSvg).g || canvas;
@@ -892,7 +892,7 @@ export class DiagramRenderer {
 
     private renderHTMLElement(
         element: DiagramHtmlElement, canvas: HTMLCanvasElement | SVGElement, htmlLayer: HTMLElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement): void {
+        transform?: Transforms, parentSvg?: SVGSVGElement, fromPalette?: boolean): void {
         let options: BaseAttributes = this.getBaseAttributes(element, transform);
         (options as RectAttributes).fill = 'transparent';
         (options as RectAttributes).cornerRadius = element.cornerRadius;
@@ -906,7 +906,7 @@ export class DiagramRenderer {
 
     public renderImageElement(
         element: ImageElement, canvas: HTMLCanvasElement | SVGElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement):
+        transform?: Transforms, parentSvg?: SVGSVGElement, fromPalette?: boolean):
         void {
         let options: BaseAttributes = this.getBaseAttributes(element, transform);
         (options as RectAttributes).cornerRadius = 0;
@@ -961,12 +961,12 @@ export class DiagramRenderer {
         (options as ImageAttributes).alignment = element.imageAlign;
         (options as ImageAttributes).scale = element.imageScale;
         (options as ImageAttributes).description = element.description ? element.description : element.id;
-        this.renderer.drawImage(canvas, options as ImageAttributes, parentSvg);
+        this.renderer.drawImage(canvas, options as ImageAttributes, parentSvg, fromPalette);
     }
 
     public renderContainer(
         group: Container, canvas: HTMLCanvasElement | SVGElement, htmlLayer: HTMLElement,
-        transform?: Transforms, parentSvg?: SVGSVGElement, createParent?: boolean):
+        transform?: Transforms, parentSvg?: SVGSVGElement, createParent?: boolean, fromPalette?: boolean):
         void {
         let svgParent: SvgParent = { svg: parentSvg, g: canvas };
         if (this.diagramId) {
@@ -1003,7 +1003,7 @@ export class DiagramRenderer {
                         parentSvg = svgParent.svg;
                     }
                 }
-                this.renderElement(child, parentG || canvas, htmlLayer, transform, parentSvg, true);
+                this.renderElement(child, parentG || canvas, htmlLayer, transform, parentSvg, true, fromPalette);
             }
         }
     }

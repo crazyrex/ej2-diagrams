@@ -190,7 +190,7 @@ export class PrintAndExport {
             if (Browser.info.name === 'msie') {
                 window.navigator.msSaveOrOpenBlob(b, fileName + '.' + fileType);
             } else {
-                let htmlElement: HTMLAnchorElement = createHtmlElement('a', {'download': fileName + '.' + fileType}) as HTMLAnchorElement;
+                let htmlElement: HTMLAnchorElement = createHtmlElement('a', { 'download': fileName + '.' + fileType }) as HTMLAnchorElement;
                 let urlLink: string = URL.createObjectURL(b);
                 htmlElement.href = urlLink;
                 let mouseEvent: MouseEvent = document.createEvent('MouseEvents');
@@ -426,7 +426,7 @@ export class PrintAndExport {
         context.restore();
         let htmlLayer: HTMLElement = getHTMLLayer(this.diagram.element.id);
         let renderer: DiagramRenderer = new DiagramRenderer('', null, false);
-        this.diagram.renderDiagramElements(canvas, renderer, htmlLayer, false);
+        this.diagram.renderDiagramElements(canvas, renderer, htmlLayer, false, true);
         return canvas;
     }
     private isImageExportable(backgroundImage: BackgroundModel | ImageModel): boolean {

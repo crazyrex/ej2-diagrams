@@ -186,7 +186,7 @@ describe('Symbol Palette', () => {
                     { id: 'native', expanded: true, symbols: svgNodes, title: 'Native Elements' },
                     { id: 'html', expanded: true, symbols: htmlNodes, iconCss: 'shapes', title: 'Html Elements' },
                     { id: 'connectors', expanded: true, height: 200, symbols: connectorSymbols, iconCss: '', title: 'Connectors' },
-                    { id: 'decorators', expanded: true, symbols: connDecorators, iconCss: '', title: 'Connectors' }
+                    { id: 'decorators', expanded: true, symbols: connDecorators, iconCss: '', title: 'Connectors' },
                 ], enableAnimation: false, enableSearch: true,
                 symbolMargin: { top: 5, bottom: 5, left: 5, right: 5 }
             });

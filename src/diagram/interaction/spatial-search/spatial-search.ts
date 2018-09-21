@@ -42,7 +42,7 @@ export class SpatialSearch {
     public removeFromAQuad(node: IGroupable): void {
         if (this.quadTable[node.id]) {
             let quad: Quad = this.quadTable[node.id];
-            let index: number = quad.objects.indexOf(node);
+            let index: number = this.objectIndex(quad.objects, node);
             if (index !== -1) {
                 quad.objects.splice(index, 1);
                 this.update(quad);
@@ -78,6 +78,16 @@ export class SpatialSearch {
     private addIntoAQuad(node: IGroupable): void {
         let quad: Quad = this.parentQuad.addIntoAQuad(node);
         this.quadTable[node.id] = quad;
+    }
+
+    /** @private */
+    private objectIndex(objects: IGroupable[], node: IGroupable): number {
+        for (let i: number = 0; i < objects.length; i++) {
+            if ((objects[i]).id === node.id) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public updateQuad(node: IGroupable): boolean {

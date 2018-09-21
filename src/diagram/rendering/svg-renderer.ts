@@ -333,7 +333,7 @@ export class SvgRenderer implements IRenderer {
             setAttributeSvg(text, attr);
         }
     }
-    public drawImage(canvas: SVGElement | HTMLCanvasElement, obj: ImageAttributes, parentSvg?: SVGSVGElement): void {
+    public drawImage(canvas: SVGElement | HTMLCanvasElement, obj: ImageAttributes, parentSvg?: SVGSVGElement, fromPalette?: boolean): void {
         let id: string = obj.id + '_image';
 
         let image: SVGImageElement;
